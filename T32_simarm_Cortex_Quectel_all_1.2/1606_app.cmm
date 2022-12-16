@@ -1,0 +1,26 @@
+ SYSTEM.DOWN
+ SYSTEM.CPU CORTEXR4
+ SYS.UP
+ 
+ &psd=os.psd()
+
+ task.config  &psd\threadx\threadx
+ menu.rp     "&psd\threadx\threadx.men"
+ 
+ ;mode.hll
+ &axf_file="CRANE_DS_XIP_DM_GENERIC.axf"
+ D.Load.binary dump\COM_DTCM.BIN 0xB0020000 /noclear
+ D.Load.binary dump\COM_ITCM.BIN 0x00000000 /noclear
+ D.Load dump\app.elf
+
+ D.Load.binary dump\com_DDR_RW.bin 0x7e06fffc /noclear
+
+
+ do dump\com_EE_Hbuf.cmm 
+ 
+
+ enddo
+
+
+
+

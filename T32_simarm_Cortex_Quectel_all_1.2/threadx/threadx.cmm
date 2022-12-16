@@ -1,0 +1,58 @@
+;--------------------------------------------------------------------------
+;
+;   ThreadX Demo for TRACE32 RTOS Debugger
+;
+;   This batchfile loads all necessary files to demonstrate
+;   the RTOS Debugger for ThreadX.
+;
+;   Created by Rudolf Dienstbeck / Lauterbach GmbH at 10.11.2000
+;
+;--------------------------------------------------------------------------
+
+
+ screen.on                    ; all messages are displayed
+ AREA.RESet
+ WINPAGE.RESET
+ WINPOS 0 24. 70. 8. 0. 0. W000
+ AREA
+
+; currently this demo runs only on the ARM Simulator
+; on ICD the demo needs memory at address 0 to 22000
+
+ if (!simulator()&&!icd())
+ (
+   print "Demo runs only on ARM Simulator or ICD!"
+   enddo
+ )
+
+; Debugger reset
+ print "resetting..."         ; send to message line
+ reset                        ; reset Instrument
+   
+; Debugger initializations
+ print "initializing..."      ; send to message line
+ SYStem.Option BigEndian ON   ; demo is in big endian mde
+ SYStem.Mode Up
+ 
+; print "loading application..."
+ Data.LOAD.Elf demo.out
+
+; initialize RTOS support
+ print "initializing ThreadX support..."
+ TASK.CONFIG threadx         ; load ThreadX Awareness (threadx.t32)
+ MENU.ReProgram threadx      ; load ThreadX Menu (threadx.men)
+ HELP.FILTER.Add rtosthreadx
+
+ print "load complete."      ; send to Message Line
+
+; open some windows
+ WINPOS 0. 0. 70. 21.
+ Data.List
+ WINPOS 40. 10. 55. 11. 0. 1. W001
+ TASK.THread
+
+; init ThreadX
+ Go thread_0_entry         ; first thread to run
+
+ enddo
+

@@ -1,0 +1,126 @@
+Start:
+;Create the new window
+Area.Reset
+Area.Create SPRDIO 200. 500.
+Area.Select SPRDIO
+Area SPRDIO
+
+print "config the arm cpu ..."
+SYSTEM.CPU CortexA7
+SYSTEM.OPTION BIGENDIAN OFF
+SYSTEM.UP
+
+;print "select the axf file..."
+
+d.load D:\bug\*.axf
+
+;local &memstartaddress
+;print "Enter memory start address:"
+;enter &memstartaddress
+
+print "Select the memory file ..."
+d.load.binary D:\bug\*.mem 0x80000000 /noclear
+
+local &curr_r14
+local &curr_cpsr
+local &curr_spsr
+local &curr_spsr_mode
+local &curr_cpsr_mode
+local &curr_exception_type
+local &cur_mode_reg_address
+local &svc_mode_reg_address
+
+&cur_mode_reg_address=v.value(&cur_mode_reg)
+R.S CPSR V.Value(*((uint32*)(&cur_mode_reg_address+68)))
+R.S r0 V.Value(*((uint32*)(&cur_mode_reg_address)))
+R.S r1 V.Value(*((uint32*)(&cur_mode_reg_address+4)))
+R.S r2 V.Value(*((uint32*)(&cur_mode_reg_address+8)))
+R.S r3 V.Value(*((uint32*)(&cur_mode_reg_address+12)))
+R.S r4 V.Value(*((uint32*)(&cur_mode_reg_address+16)))
+R.S r5 V.Value(*((uint32*)(&cur_mode_reg_address+20)))
+R.S r6 V.Value(*((uint32*)(&cur_mode_reg_address+24)))
+R.S r7 V.Value(*((uint32*)(&cur_mode_reg_address+28)))
+R.S r8 V.Value(*((uint32*)(&cur_mode_reg_address+32)))
+R.S r9 V.Value(*((uint32*)(&cur_mode_reg_address+36)))
+R.S r10 V.Value(*((uint32*)(&cur_mode_reg_address+40)))
+R.S r11 V.Value(*((uint32*)(&cur_mode_reg_address+44)))
+R.S r12 V.Value(*((uint32*)(&cur_mode_reg_address+48)))
+R.S r13 V.Value(*((uint32*)(&cur_mode_reg_address+52)))
+R.S r14 V.Value(*((uint32*)(&cur_mode_reg_address+56)))
+R.S pc V.Value(*((uint32*)(&cur_mode_reg_address+60)))
+R.S SPSR V.Value(*((uint32*)(&cur_mode_reg_address+64)))
+
+&curr_r14=V.Value(*((uint32*)(&cur_mode_reg_address+56)))
+&curr_cpsr=V.Value(*((uint32*)(&cur_mode_reg_address+68)))
+&curr_spsr=V.Value(*((uint32*)(&cur_mode_reg_address+64)))
+
+&curr_cpsr_mode=(&curr_cpsr&0x1f)
+&curr_spsr_mode=(&curr_spsr&0x1f)
+&curr_exception_type=v.value(s_exception_type)
+
+&svc_mode_reg_address=V.Value(&svc_mode_reg)
+
+print "curr_cpsr is &curr_cpsr"
+print "curr_spsr is &curr_spsr"
+print "curr_cpsr_mode is &curr_cpsr_mode"
+print "curr_spsr_mode is &curr_spsr_mode"
+print "curr_exception_type is &curr_exception_type"
+
+if &curr_cpsr_mode==0x13
+(
+print "the curr mode is svc ..."
+;
+)
+else if (&curr_cpsr_mode==0x17)&&(&curr_exception_type==0x4)
+(
+;data abort
+	if &curr_spsr_mode==0x13
+	(
+		R.S CPSR &curr_spsr
+		R.S PC (&curr_r14-8)
+		R.S r13 V.Value(*((uint32*)(&svc_mode_reg_address)))
+		R.S r14 V.Value(*((uint32*)(&svc_mode_reg_address+4)))
+	)
+)
+else if (&curr_cpsr_mode==0x17)&&(&curr_exception_type==0x3)
+(
+;prefetch abort
+	if &curr_spsr_mode==0x13
+	(
+		R.S CPSR &curr_spsr
+		R.S PC (&curr_r14-4)
+		R.S r13 V.Value(*((uint32*)(&svc_mode_reg_address)))
+		R.S r14 V.Value(*((uint32*)(&svc_mode_reg_address+4)))
+	)
+)
+
+else if &curr_cpsr_mode==0x1b
+(
+;undef instr
+	if &curr_spsr_mode==0x13
+	(
+		R.S CPSR &curr_spsr
+		R.S PC (&curr_r14)
+		R.S r13 V.Value(*((uint32*)(&svc_mode_reg_address)))
+		R.S r14 V.Value(*((uint32*)(&svc_mode_reg_address+4)))
+	)
+)
+
+print "recover completely..."
+
+task.config E:\Tool\8310_T32\T32\threadx\threadx.t32
+menu.reprogram  E:\Tool\8310_T32\T32\threadx\threadx.men
+
+d.l
+
+V.F
+
+
+
+
+
+
+
+
+
+

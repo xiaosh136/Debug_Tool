@@ -1,0 +1,4 @@
+1. 新建dump文件夹
+2. 将dump文件和axf文件放入dump文件夹下，T32_ASR_Quectel.bat脚本可自动进行dump解析
+
+其他方式请手动执行

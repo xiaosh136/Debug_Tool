@@ -1,0 +1,49 @@
+ SYSTEM.DOWN
+ SYSTEM.CPU CORTEXR4
+ SYS.UP
+ 
+ &psd=os.psd()
+ &dump_dir="dump"
+ &axf_file="kernel.axf"
+
+ ;Add some extra buttons to the toolbar
+
+ task.config  &psd\threadx\threadx
+ menu.rp     "&psd\threadx\threadx.men"
+ 
+ ;mode.hll
+ 
+ D.Load.binary &dump_dir\COM_DTCM.BIN 0xB0020000 /noclear
+ D.Load.binary &dump_dir\COM_ITCM.BIN 0x00000000 /noclear
+ D.Load &dump_dir\&axf_file
+ data.copy   Load$$PS_CODE_IN_PSRAM$$Base++0x0076fffc    0x7e210000
+ &soft_version=data.string(BuildVersion)
+ AREA.CREATE CONTEXT
+ AREA.VIEW CONTEXT
+ AREA.SELECT CONTEXT
+ PRINT "Software version from AXF file: &soft_version"
+ 
+ D.Load.binary &dump_dir\com_DDR_RW.bin 0x7e20fffc /noclear
+ &act_ver=data.string(BuildVersion)
+ PRINT "Software version from Dump files: &act_ver"
+ &version_mismatch=0
+ IF ("&act_ver"!="&soft_version")
+ (
+    PRINT "ATTENTION: MISMATCHED VERSION - this implies AXF file is wrong"
+    &version_mismatch=1
+    enddo
+ )
+ 
+ ;data.copy   Load$$PS_CODE_IN_PSRAM$$Base++0x0076fffc    0x7e210000
+ ;data.copy   Load$$DDR_ITCM$$Base++0x00010000    0x00000000
+ do &dump_dir\com_EE_Hbuf.cmm 
+ 
+ ;r.s pc 0
+ ;d.l
+ ;symbol.browse.source 
+ 
+ enddo
+
+
+
+
