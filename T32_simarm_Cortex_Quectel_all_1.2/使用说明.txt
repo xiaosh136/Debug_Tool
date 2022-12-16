@@ -1,8 +1,22 @@
 解析步骤：
-8910:
+展锐:
+8910：
 1.  将抓取到的dump文件，固件编译生成的的8915DM_cat1_open_core.elf和appimage.elf文件放入8910dump文件夹下
-2. 运行T32_8910_Quectel_ap.bat脚本可自动进行dump解析
+2. 运行T32_8910_Quectel_ap.bat脚本可自动进行dump解析，
+
+8310:
+请执行：T32_UNISOC_Quectel_uis8310.bat，会自动弹出需要加载的文件，如：
+1、加载UMS9117_uis8310_MI_1h10_64M_VSIM_halo.axf (后缀名axf)；
+2、加载armlog下的2022_08_24_14_43_26_088_1.mem (后缀名mem)
+
 ASR:
 1. 新建dump文件夹
-2. 将dump文件和axf文件放入dump文件夹下，T32_ASR_Quectel.bat脚本可自动进行dump解析
+2. 将dump文件和axf文件放入dump文件夹下，T32_ASR_Quectel_XXX.bat脚本可自动进行dump解析(kernel.bat是内核侧，app.bat是应用侧)
+
+
+移芯:
+1. 新建dump文件夹
+2. 将RamDumpData.bin文件和ap_at_command.elf文件放入dump文件夹下，T32_EIGEN_Quectel.bat脚本可自动进行dump解析
+
+
 其他方式请手动执行
