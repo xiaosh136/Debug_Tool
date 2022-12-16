@@ -1,0 +1,177 @@
+SYStem.CPU CortexM3
+SYStem.CpuAccess Enable
+
+SYStem.Up
+
+data.load.binary dump\RamDumpData.bin  0x0
+data.load.elf dump\ap_at_command.elf /noclear
+
+; initialize RTOS support
+PRINT "initializing FreeRTOS support.."
+TASK.CONFIG freertos\freertos.t32 0 0x400; load FreeRTOS awareness
+MENU.ReProgram freertos\freertos.men; load FreeRTOS menu
+HELP.FILTER.Add rtosfreertos; and FreeRTOS awareness manual to filtered help
+PRINT "load complete."
+
+; ap 64k ram addr: 0x00000 ---0x10000
+; cp 64k ram addr: 0x200000 ---0x210000
+; ap cp 1.25m ram addr: 0x400000---0x540000
+; EC618---0x618    EC616/616S---0x616
+; core type: AP--0x1     CP--0x2
+
+GLOBAL &fileName &startAddress &endAddress &newStartAddress &imageType
+LOCAL &VAL_R0 &VAL_R1 &VAL_R2 &VAL_R3 &VAL_R4 &VAL_R5 &VAL_R6 &VAL_R7 &VAL_R8 &VAL_R9 &VAL_R10 &VAL_R11 &VAL_R12
+LOCAL &VAL_SP &VAL_PSP &VAL_MSP &VAL_PC &VAL_LR &VAL_PSR &VAL_RETURN
+LOCAL &VAL_CONTROL &VAL_BASEPRI &VAL_PRIMASK &VAL_FAULTMASK
+LOCAL &VAL_EXCEP_INFO &VAL_CHIP_TYPE &VAL_CORE_TYPE &VAL_REG_INFO_ADDR &VAL_EXCEP_RAM_ADDR &VAL_AP_EXCEP_ADDR &VAL_CP_EXCEP_ADDR &VAL_EXCEP_TYPE
+LOCAL &BASE_ADDR
+
+&VAL_EXCEP_INFO=0x53E000
+&VAL_CHIP_TYPE=D.L(D:&VAL_EXCEP_INFO)
+PRINT &VAL_CHIP_TYPE
+
+&imageType="EcChipVerEc618CoreAp"
+IF &VAL_CHIP_TYPE==0x618
+(
+    &startAddress=0x200000
+    &endAddress=0x210000
+    &newStartAddress=0x0
+    &VAL_EXCEP_INFO=0x53E000
+    
+    &VAL_CORE_TYPE=D.L(D:&VAL_EXCEP_INFO+0x4)
+    IF "&imageType"=="EcChipVerEc618CoreAp"
+    (
+        &VAL_AP_EXCEP_ADDR=D.L(D:&VAL_EXCEP_INFO+0x8)
+        PRINT &VAL_AP_EXCEP_ADDR
+        &VAL_EXCEP_RAM_ADDR=D.L(D:&VAL_EXCEP_INFO+0x10)
+        PRINT &VAL_EXCEP_RAM_ADDR
+        &VAL_EXCEP_TYPE=D.L(D:&VAL_EXCEP_INFO+0x14)
+        PRINT &VAL_EXCEP_TYPE
+        &VAL_REG_INFO_ADDR=&VAL_AP_EXCEP_ADDR+0x0C
+        &BASE_ADDR=&VAL_REG_INFO_ADDR
+        PRINT &BASE_ADDR
+    )
+    IF "&imageType"=="EcChipVerEc618CoreCp"
+    (
+        data.copy &startAddress--&endAddress &newStartAddress
+        &VAL_AP_EXCEP_ADDR=D.L(D:&VAL_EXCEP_INFO+0x0C)
+        PRINT &VAL_AP_EXCEP_ADDR
+        &VAL_EXCEP_RAM_ADDR=D.L(D:&VAL_EXCEP_INFO+0x10)
+        PRINT &VAL_EXCEP_RAM_ADDR
+        &VAL_EXCEP_TYPE=D.L(D:&VAL_EXCEP_INFO+0x14)
+        PRINT &VAL_EXCEP_TYPE
+        &VAL_REG_INFO_ADDR=&VAL_AP_EXCEP_ADDR+0x0C
+        &BASE_ADDR=&VAL_REG_INFO_ADDR
+        PRINT &BASE_ADDR
+    )
+)
+ELSE
+(
+    &VAL_EXCEP_INFO=0x00043FF0
+    &BASE_ADDR=D.L(D:&VAL_EXCEP_INFO)+0x10
+    PRINT &BASE_ADDR
+)
+
+&VAL_R0=D.L(D:&BASE_ADDR)
+R.S R0 &VAL_R0
+
+&VAL_R1=D.L(D:&BASE_ADDR+0x04)
+R.S R1 &VAL_R1
+
+&VAL_R2=D.L(D:&BASE_ADDR+0x08)
+R.S R2 &VAL_R2
+
+&VAL_R3=D.L(D:&BASE_ADDR+0x0C)
+R.S R3 &VAL_R3
+
+&VAL_R4=D.L(D:&BASE_ADDR+0x10)
+R.S R4 &VAL_R4
+
+&VAL_R5=D.L(D:&BASE_ADDR+0x14)
+R.S R5 &VAL_R5
+
+&VAL_R6=D.L(D:&BASE_ADDR+0x18)
+R.S R6 &VAL_R6
+
+&VAL_R7=D.L(D:&BASE_ADDR+0x1C)
+R.S R7 &VAL_R7
+
+&VAL_R8=D.L(D:&BASE_ADDR+0x20)
+R.S R8 &VAL_R8
+
+&VAL_R9=D.L(D:&BASE_ADDR+0x24)
+R.S R9 &VAL_R9
+
+&VAL_R10=D.L(D:&BASE_ADDR+0x28)
+R.S R10 &VAL_R10
+
+&VAL_R11=D.L(D:&BASE_ADDR+0x2C)
+R.S R11 &VAL_R11
+
+&VAL_R12=D.L(D:&BASE_ADDR+0x30)
+R.S R12 &VAL_R12
+
+&VAL_SP=D.L(D:&BASE_ADDR+0x34)
+R.S R13 &VAL_SP
+
+&VAL_LR=D.L(D:&BASE_ADDR+0x38)
+R.S LR &VAL_LR
+
+&VAL_PC=D.L(D:&BASE_ADDR+0x3C)
+R.S PC &VAL_PC
+
+&VAL_PSR=D.L(D:&BASE_ADDR+0x40)
+R.S XPSR &VAL_PSR
+
+&VAL_RETURN=D.L(D:&BASE_ADDR+0x44)
+
+&VAL_MSP=D.L(D:&BASE_ADDR+0x48)
+R.S MSP &VAL_MSP
+
+&VAL_PSP=D.L(D:&BASE_ADDR+0x4C)
+R.S PSP &VAL_PSP
+
+&VAL_CONTROL=D.L(D:&BASE_ADDR+0x50)
+R.S CONTROL &VAL_CONTROL
+
+&VAL_BASEPRI=D.L(D:&BASE_ADDR+0x54)
+R.S BASEPRI &VAL_BASEPRI
+
+&VAL_PRIMASK=D.L(D:&BASE_ADDR+0x58)
+R.S PRIMASK &VAL_PRIMASK
+
+&VAL_FAULTMASK=D.L(D:&BASE_ADDR+0x5C)
+R.S FAULTMASK &VAL_FAULTMASK
+
+IF "&imageType"=="EcChipVerEc618CoreAp"
+(
+    IF &VAL_CORE_TYPE==0x2
+    (
+        &VAL_CONTROL=0x2
+        R.S CONTROL &VAL_CONTROL
+    )
+)
+
+IF "&imageType"=="EcChipVerEc618CoreCp"
+(
+    IF &VAL_CORE_TYPE==0x1
+    (
+        &VAL_CONTROL=0x2
+        R.S CONTROL &VAL_CONTROL
+    )
+)
+
+Var.AddWatch trace_node
+IF &VAL_CHIP_TYPE==0x618
+(
+    Var.AddWatch excepInfoStore
+    Var.AddWatch gXPShareInfo
+)
+ELSE
+(
+    Var.AddWatch xStart
+    Var.AddWatch pxEnd
+)
+TASK.tasklist
+
+
