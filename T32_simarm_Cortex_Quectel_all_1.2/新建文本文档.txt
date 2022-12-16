@@ -1,0 +1,3 @@
+8915DM_cat1_open_core.elf
+
+appimage.elf

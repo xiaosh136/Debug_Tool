@@ -1,0 +1,43 @@
+ SYSTEM.DOWN
+ SYSTEM.CPU CORTEXR4
+ SYS.UP
+ 
+ &psd=os.psd()
+ ;Add some extra buttons to the toolbar
+
+ task.config  &psd\threadx\threadx
+ menu.rp     "&psd\threadx\threadx.men"
+ 
+ ;mode.hll
+ 
+ ;D.Load.binary dump/COM_DTCM.BIN 0xb0020000 /noclear
+ D.Load dump/NEZHAC_CP_SKL_MIFI_TX.axf
+ ;&soft_version=data.string(BuildVersion)
+ ;AREA.CREATE CONTEXT
+ ;AREA.VIEW CONTEXT
+ ;AREA.SELECT CONTEXT
+ ;PRINT "Software version from AXF file: &soft_version"
+ 
+ ;D.Load.binary dump/com_DDR_RW.bin 0x06000000 /noclear
+ ;&act_ver=data.string(BuildVersion)
+ ;PRINT "Software version from Dump files: &act_ver"
+ ;&version_mismatch=0
+ ;IF ("&act_ver"!="&soft_version")
+ ;(
+ ;   PRINT "ATTENTION: MISMATCHED VERSION - this implies AXF file is wrong"
+ ;   &version_mismatch=1
+ ;   enddo
+ ;)
+ 
+ ;data.copy   Load$$DDR_ITCM$$Base++0x00010000    0x00000000
+ ;do dump/com_EE_Hbuf.cmm 
+ 
+ ;r.s pc 0
+ ;d.l
+ ;symbol.browse.source 
+ 
+ enddo
+
+
+
+
