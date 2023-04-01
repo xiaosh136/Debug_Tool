@@ -1,0 +1,77 @@
+; --------------------------------------------------------------------------------
+; @Title: Script File to load ETB raw data in the TRACE32 Simulator
+; @Description: 
+;   This script loads the ETB raw data in the TRACE32 Simulator.
+;   You need to edit the script to setup exactely the same ETM
+;   configuration used when the trace data has been generated.
+;   Otherwhise the raw data cannot be correctly decoded.
+; @Keywords: ETB, raw, simulator, trace
+; @Author: -
+; @Copyright: (C) 1989-2014 Lauterbach GmbH, licensed for use with TRACE32(R) only
+; --------------------------------------------------------------------------------
+; $Id: etb_sim_import.cmm 6904 2014-04-21 15:16:07Z kjmal $
+
+global &_global_export_dir
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+
+    LOCAL &mem_file_path
+  
+; System Settings
+
+;	SYStem.CPU *
+	SYStem.CPU CortexR8MPCore
+;    SYStem.CPU CortexR8
+    SYStem.CONFIG CoreNumber 2
+    CORE.ASSIGN 1 2
+	
+	; set any address here to enable the ETM in TRACE32
+	SYStem.CONFIG ETMBASE 1000
+	SYStem.CONFIG TPIU.Base 3000
+	SYStem.Up
+	
+; Load the target code
+	Data.LOAD "&export_dir/*.axf"
+
+; Load the memory ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	DIALOG.FILE "&export_dir/*.mem"
+  ENTRY &mem_file_path
+  
+  ; Whole memory
+  Data.LOAD.binary &mem_file_path 0x88000000 /noclear
+  Data.LOAD.binary &mem_file_path 0x88000000++0x15000000 /SKIP 0x00000000 /noclear
+  
+	; SIPC_MEM
+  Data.LOAD.binary &mem_file_path 0x87800000++0x00800000 /SKIP 0x151C3000 /noclear
+  
+	; PSCP_AON_IRAM
+	; PSCP_LLRAM
+  Data.LOAD.binary &mem_file_path 0x00000000++0x00001000 /SKIP 0x15000000 /noclear
+  Data.LOAD.binary &mem_file_path 0x54100000++0x00060000 /SKIP 0x15003000 /noclear
+  Data.LOAD.binary &mem_file_path 0x2F000000++0x00000C00 /SKIP 0x151B720C /noclear
+; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; ETM Settings, Please note that these settings must match the used ETM settings
+; when recording the trace. Otherwhise, the displayed trace here could contain 
+; erros.
+	ETM.PortSize 32.
+	ETM.ContextID OFF
+;	ETM.PortMode  Normal
+	tpiu.portmode wrapped
+	ETM.DataTrace OFF
+	ETM.TImeMode off
+	
+; Import trace data
+	LA.Mode FLOWTRACE ON
+;	LA.IMPORT.ETB etb.bin
+	LA.IMPORT.ETB "&export_dir/*.bin"
+	
+;	LA.List tp tpinfo list.address list.code DEFault
+	LA.List
+	LA.List /core 0	
+	LA.List /core 1
+	
+	ENDDO

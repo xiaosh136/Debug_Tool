@@ -1,0 +1,55 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Menu Component                                                                                        ;;
+;;                                                                                                        ;;
+;;    PLY Menu : Statistics                                                                               ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; Set the PLY script directory
+global &_global_PLY_script_dir
+&_global_PLY_script_dir=os.ppd()
+&curr_script_dir=os.ppd()
+
+MENU.ReProgram
+(
+  ADD
+  MENU
+  (
+    POPUP "[[Pizer Love You!]"
+    (
+      POPUP "[:alist]Statistics"
+      (
+        ; Statistics of Symbols
+        MENUITEM "[:alist]The System Statistics"
+        (
+          do "&_global_PLY_script_dir\_stat_system_statistics.cmm"
+        )
+      )
+    )
+  )
+)
+
+enddo

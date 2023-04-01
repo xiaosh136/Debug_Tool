@@ -1,0 +1,102 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Menu Component                                                                                        ;;
+;;                                                                                                        ;;
+;;    PLY Menu : OSA                                                                                      ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; Set the PLY script directory
+global &_global_PLY_script_dir
+&_global_PLY_script_dir=os.ppd()
+&curr_script_dir=os.ppd()
+
+MENU.ReProgram
+(
+  ADD
+  MENU
+  (
+    POPUP "[[Pizer Love You!]"
+    (
+      POPUP "OSA/SCI over TX"
+      (
+        ; Dump SCI-Signal Queue Data to File
+        MENUITEM "[:plist]Export SCI-Signal Queue Data to File"
+        (
+          do "&_global_PLY_script_dir\_sci_tx_export_signal_queue_data.cmm"
+        )
+        ; Dump SDI-Msg Queue Data to File
+        MENUITEM "[:plist]Export SDI-Msg Queue Data to File"
+        (
+          do "&_global_PLY_script_dir\_sdi_tx_export_msg_queue_data.cmm"
+        )
+        AFTER "Export SDI-Msg Queue Data to File"
+        SEPARATOR
+        
+        ; Export SCI Memory to File
+        MENUITEM "[:plist]Export SCI Memory to File"
+        (
+          do "&_global_PLY_script_dir\_sci_tx_export_mem.cmm"
+        )
+        ; Export OSA Memory to File
+        MENUITEM "[:plist]Export OSA Memory to File"
+        (
+          do "&_global_PLY_script_dir\_osa_tx_export_mem.cmm"
+        )
+        ; Export an OSA Byte Pool to File
+        MENUITEM "[:plist]Export an OSA Byte Pool to File"
+        (
+          do "&_global_PLY_script_dir\_osa_tx_export_one_byte_pool.cmm"
+        )
+        ; Export an OSA Block Pool to File
+        MENUITEM "[:plist]Export an OSA Block Pool to File"
+        (
+          do "&_global_PLY_script_dir\_osa_tx_export_one_block_pool.cmm"
+        )
+        ; Export an OSA Block Pool (Freed) to File
+        MENUITEM "[:plist]Export an OSA Block Pool (Freed) to File"
+        (
+          do "&_global_PLY_script_dir\_osa_tx_export_one_block_pool_freed.cmm"
+        )
+        AFTER "Export an OSA Block Pool (Freed) to File"
+        SEPARATOR
+        
+        ; Show the TOP 10 of OSA Memory
+        MENUITEM "[:profile]Show the TOP 10 of OSA Memory"
+        (
+          do "&_global_PLY_script_dir\_osa_tx_show_mem_top_10.cmm"
+        )
+        
+        ; Show the Detailed Information of Allocation
+        MENUITEM "[:winpage]Show the Detailed Information of an Allocation"
+        (
+          do "&_global_PLY_script_dir\_osa_tx_show_one_alloc.cmm"
+        )
+      )
+    )
+  )
+)
+
+enddo

@@ -1,0 +1,216 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  ARM Component                                                                                         ;;
+;;                                                                                                        ;;
+;;    Common: List MPU Regions                                                                            ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Create logging output window
+area.create list_mpu_regions_win 200. 500.
+area.select list_mpu_regions_win
+area.view list_mpu_regions_win
+
+;PMACRO.list
+local &err
+&err=0
+
+&curr_script_dir=os.ppd()
+
+if !symbol.exist(_mpu_region)
+(
+  &err=1
+  print "Error: `_mpu_region' does not exist. EXIT script"
+  goto CMM_END
+)
+
+&MPU_RGN_PERM_EXECNEVER=0x1000
+&MPU_RGN_PERM_PRV_NO_USR_NO=0x0
+&MPU_RGN_PERM_PRV_RW_USR_NO=0x100
+&MPU_RGN_PERM_PRV_RW_USR_RO=0x200
+&MPU_RGN_PERM_PRV_RW_USR_RW=0x300
+&MPU_RGN_PERM_PRV_RO_USR_NO=0x500
+&MPU_RGN_PERM_PRV_RO_USR_RO=0x600
+
+;
+; TEX[2:0], C, B bits[5:3, 1:0]
+;
+
+; b0000000
+&MPU_RGN_ATTR_STRONGORDER=0x0
+; b0000001
+&MPU_RGN_ATTR_DEV_SHARE=0x1
+; b0000010, Normal outter and inner write-through, no write -allocate
+&MPU_RGN_ATTR_NOR_WT_OI_WA_NO=0x2
+; b0000011, Normal outer and inner write-back, no write-allocate
+&MPU_RGN_ATTR_NOR_WB_OI_WA_NO=0x3
+; b1000000, Normal outer and inner non-cacheable
+&MPU_RGN_ATTR_NOR_CACHE_NO=0x8
+; b1000011, Normal outer and inner write-back, write-allocate
+&MPU_RGN_ATTR_NOR_WB_OI_WA=0xb
+; b100000000, Non-shareable device
+&MPU_RGN_ATTR_DEV_SHARE_NO=0x10
+; If region is normal memory, memory is Shareable 
+&MPU_RGN_ATTR_SHAREABLE=0x4
+
+print " number   baseaddr (endaddr ) sub  (rgn size)  ap, attr, enable"
+&i=0
+&cnt=v.value(sizeof(_mpu_region)/sizeof(_mpu_region[0]))
+
+while (&i<&cnt)
+(
+  &number=v.value(_mpu_region[&i].number)
+  &baseaddr=v.value(_mpu_region[&i].baseaddr)
+  &size=v.value(_mpu_region[&i].size)
+  &ap=v.value(_mpu_region[&i].ap)
+  &attr=v.value(_mpu_region[&i].attr)
+  &enable=v.value(_mpu_region[&i].enable)
+  
+  &number_format=format.decimal(4, &number)
+  &baseaddr_format=format.hex(8, &baseaddr)
+  &size_format=format.hex(8, &size)
+  
+  ; 0 - 2B
+  ; 1 - 4B
+  ; 2 - 8B
+  ; 3 - 16B
+  ; 4 - 32B
+  ; 5 - 64B
+  &sub_mask=v.value((&size)>>8)
+  &sub_mask_mask=format.hex(2, &sub_mask)
+  &rgn_size=v.value(((&size)>>1)&0x1f)
+  local &rgn_size_format
+  if (&rgn_size==0x1f)
+  (
+    &rgn_size=0xffffffff
+    &rgn_size_format=format.hex(8, &rgn_size)
+  )
+  else
+  (
+    &rgn_size=v.value((unsigned int)(1<<((&rgn_size)+1)))
+    &rgn_size_format=format.hex(8, &rgn_size)
+  )
+  &endaddr=&baseaddr+&rgn_size
+  &endaddr_format=format.hex(8, &endaddr)
+  
+  &execnever=""
+  &ap_comments=""
+  &tmp_ap=&ap
+  if (v.value((&tmp_ap)&(&MPU_RGN_PERM_EXECNEVER))==(&MPU_RGN_PERM_EXECNEVER))
+  (
+    &tmp_ap=&tmp_ap-&MPU_RGN_PERM_EXECNEVER
+    &execnever="EXECNEVER"
+  )
+  if (&tmp_ap==&MPU_RGN_PERM_PRV_RW_USR_NO)
+  (
+    &tmp_ap=&tmp_ap-&MPU_RGN_PERM_EXECNEVER
+    &ap_comments="RW"
+  )
+  else if (&tmp_ap==&MPU_RGN_PERM_PRV_RO_USR_NO)
+  (
+    &tmp_ap=&tmp_ap-&MPU_RGN_PERM_EXECNEVER
+    &ap_comments="RO"
+  )
+  else if (&tmp_ap==&MPU_RGN_PERM_PRV_RW_USR_NO)
+  (
+    &tmp_ap=&tmp_ap-&MPU_RGN_PERM_EXECNEVER
+    &ap_comments="RW"
+  )
+  if ("&execnever"!="")
+  (
+    if ("&ap_comments"!="")
+    (
+      &ap_comments="&ap_comments|&execnever"
+    )
+    else
+    (
+      &ap_comments="&execnever"
+    )
+  )
+  
+  ;
+  ; TEX[2:0], C, B bits[5:3, 1:0]
+  ;
+  
+  &_TEX=v.value((&attr)&0x7)
+  &_C=v.value(((&attr)>>3)&0x3)
+  &_B=v.value(((&attr)>>3)&0x3)
+  
+  &attr_comments=""
+  &attr_shareable=""
+  &tmp_attr=&attr
+  if (v.value((&tmp_attr)&(&MPU_RGN_ATTR_SHAREABLE))==&MPU_RGN_ATTR_SHAREABLE)
+  (
+    &tmp_attr=&tmp_attr-&MPU_RGN_ATTR_SHAREABLE
+    &attr_shareable="SHAREABLE"
+  )
+  
+  if (&tmp_attr==&MPU_RGN_ATTR_STRONGORDER)
+  (
+    &attr_comments="STRONGORDER"
+  )
+  else if (&tmp_attr==&MPU_RGN_ATTR_DEV_SHARE)
+  (
+    &attr_comments="DEV_SHARE"
+  )
+  else if (&tmp_attr==&MPU_RGN_ATTR_NOR_WT_OI_WA_NO)
+  (
+    &attr_comments="WRITE-THROUGH"
+  )
+  else if (&tmp_attr==&MPU_RGN_ATTR_NOR_WB_OI_WA_NO)
+  (
+    &attr_comments="WRITE-BACK"
+  )
+  else if (&tmp_attr==&MPU_RGN_ATTR_NOR_CACHE_NO)
+  (
+    &attr_comments="NO-CACHE"
+  )
+  else if (&tmp_attr==&MPU_RGN_ATTR_NOR_WB_OI_WA)
+  (
+    &attr_comments="WRITE-BACK, WRITE-ALLOCATE"
+  )
+  else if (&tmp_attr==&MPU_RGN_ATTR_DEV_SHARE_NO)
+  (
+    &attr_comments="NON-SHAREABLE DEVICE"
+  )
+  
+  if ("&attr_shareable"!="")
+  (
+    if ("&attr_comments"!="")
+    (
+      &attr_comments="&attr_comments|&attr_shareable"
+    )
+    else
+    (
+      &attr_comments="&attr_shareable"
+    )
+  )
+  
+  print "&number_format      &baseaddr_format (&endaddr_format)  &sub_mask_mask  (&rgn_size_format)  &ap (&ap_comments), &attr (&attr_comments), &enable"
+  
+  &i=&i+1
+)
+
+CMM_END:
+enddo

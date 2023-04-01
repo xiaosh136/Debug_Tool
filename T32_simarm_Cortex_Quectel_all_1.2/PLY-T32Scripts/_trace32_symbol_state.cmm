@@ -1,0 +1,101 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  TRACE32 Component                                                                                     ;;
+;;                                                                                                        ;;
+;;    TRACE32 : symbol.state                                                                              ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+global &_global_symbol_section_cnt &_global_symbol_function_cnt &_global_symbol_type_cnt &_global_symbol_file_cnt &_global_symbol_line_cnt
+
+entry &caller_file_path
+
+; remove \"\"
+&caller_file_path=&caller_file_path
+
+&_global_symbol_section_cnt=0
+&_global_symbol_function_cnt=0
+&_global_symbol_type_cnt=0
+&_global_symbol_file_cnt=0
+&_global_symbol_line_cnt=0
+
+printer.open "&caller_file_path"
+winprint.symbol.state
+printer.close
+;winclear top
+
+; analyze file
+local &myline
+open #1 "&caller_file_path" /read
+read #1 %line &myline
+while !file.eof(1)
+(
+  if (string.scan("&myline","functions",0)!=-1&&string.scan("&myline","|",0)!=-1)
+  (
+    &pos=string.scan("&myline","|",0)
+    &pos=&pos+1
+    &end_pos=string.length("&myline")
+    &_global_symbol_function_cnt=string.mid("&myline",&pos,&end_pos-&pos)
+    &_global_symbol_function_cnt=string.trim("&_global_symbol_function_cnt")
+    &_global_symbol_function_cnt=v.value("&_global_symbol_function_cnt");
+  )
+  else if (string.scan("&myline","types",0)!=-1&&string.scan("&myline","|",0)!=-1)
+  (
+    &pos=string.scan("&myline","1",0)
+    &pos=&pos+1
+    &end_pos=string.length("&myline")
+    &_global_symbol_type_cnt=string.mid("&myline",&pos,&end_pos-&pos)
+    &_global_symbol_type_cnt=string.trim("&_global_symbol_type_cnt")
+    &_global_symbol_type_cnt=v.value("&_global_symbol_type_cnt");
+  )
+  else if (string.scan("&myline","sources",0)!=-1&&string.scan("&myline","|",0)!=-1)
+  (
+    &pos=string.scan("&myline","|",0)
+    &pos=&pos+1
+    &end_pos=string.length("&myline")
+    &_global_symbol_file_cnt=string.mid("&myline",&pos,&end_pos-&pos)
+    &_global_symbol_file_cnt=string.trim("&_global_symbol_file_cnt")
+    &_global_symbol_file_cnt=v.value("&_global_symbol_file_cnt");
+  )
+  else if (string.scan("&myline","lines",0)!=-1&&string.scan("&myline","|",0)!=-1)
+  (
+    &pos=string.scan("&myline","|",0)
+    &pos=&pos+1
+    &end_pos=string.length("&myline")
+    &_global_symbol_line_cnt=string.mid("&myline",&pos,&end_pos-&pos)
+    &_global_symbol_line_cnt=string.trim("&_global_symbol_line_cnt")
+    &_global_symbol_line_cnt=v.value("&_global_symbol_line_cnt");
+  )
+  else if (string.scan("&myline","sections",0)!=-1&&string.scan("&myline","|",0)!=-1)
+  (
+    &pos=string.scan("&myline","|",0)
+    &pos=&pos+1
+    &end_pos=string.length("&myline")
+    &_global_symbol_section_cnt=string.mid("&myline",&pos,&end_pos-&pos)
+    &_global_symbol_section_cnt=string.trim("&_global_symbol_section_cnt")
+    &_global_symbol_section_cnt=v.value("&_global_symbol_section_cnt");
+  )
+  read #1 %line &myline
+)
+close #1

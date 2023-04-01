@@ -1,0 +1,179 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  OSA/TX Component                                                                                      ;;
+;;                                                                                                        ;;
+;;    Memory: Export the allocations of a block pool into the HOST file                                   ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; Create logging output window
+area.create logging_win 200. 500.
+area.select logging_win
+area.view logging_win
+
+;PMACRO.list
+local &err
+&err=0
+
+; Enter the export directory if null
+global &_global_export_dir
+&curr_script_dir=os.ppd()
+do "&curr_script_dir\_setting_input_export_dir_if_null.cmm"
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+
+; const values
+global &ENTITY_INFRA &ENTITY_STACK &ENTITY_GSM_STACK &ENTITY_W_STACK &ENTITY_SIGNAL
+global &ENTITY_TD_LTE_STACK &ENTITY_IMS_STACK &ENTITY_NR_STACK
+global &ENTITY_PSEUDO_START &ENTITY_OSA &ENTITY_USER &ENTITY_LAST &ENTITY_KAL
+do "&curr_script_dir\_osa_load_entity_values.cmm"
+&entity_cnt=v.value(sizeof(entity_name)/sizeof(entity_name[0]))
+
+print "Please input the address of block pool: "
+enter &input_ptr
+
+if ("&input_ptr"=="")
+(
+  &err=1
+  print "Error: No input !!!. EXIT script"
+  goto CMM_END
+)
+
+if (string.scan("&input_ptr","0x",0)==-1)&&(string.scan("&input_ptr","0X",0)==-1)
+(
+  &input_ptr_string="0x&input_ptr"
+  &input_ptr=v.value(&input_ptr_string)
+)
+
+&ppool_ctl_block=&input_ptr
+&tx_block_pool_id=data.string(d:v.value(((osa_os_pool_type *)&ppool_ctl_block)->tx_block_pool_id))
+&tx_block_pool_name_addr=v.value(((osa_os_pool_type *)&ppool_ctl_block)->tx_block_pool_name)
+&tx_block_pool_name=data.string(d:v.value(((osa_os_pool_type *)&ppool_ctl_block)->tx_block_pool_name))
+&tx_block_pool_start=v.value(((osa_os_pool_type *)&ppool_ctl_block)->tx_block_pool_start)
+&tx_block_pool_end=&tx_block_pool_start+v.value(((osa_os_pool_type *)&ppool_ctl_block)->tx_block_pool_size)
+&tx_block_pool_total=v.value(((osa_os_pool_type *)&ppool_ctl_block)->tx_block_pool_total)
+&tx_block_pool_available=v.value(((osa_os_pool_type *)&ppool_ctl_block)->tx_block_pool_available)
+&tx_block_pool_block_size=v.value(((osa_os_pool_type *)&ppool_ctl_block)->tx_block_pool_block_size)
+&block_size=&tx_block_pool_block_size+4
+
+; Makeup output file path
+local &output_file_path
+local &output_file_name
+&output_file_name="osa_tx_block_pool_allocs_&(ppool_ctl_block)_&(tx_block_pool_name).txt"
+&output_file_path="&(export_dir)/&output_file_name"
+
+print "Export to directory : &(export_dir)"
+print "Start time : " clock.date() "  " clock.time() "  ..."
+print ""
+
+; Create output file
+area.create output_file_win 200. 500.
+area.open output_file_win "&output_file_path"
+area.select output_file_win
+
+print ""
+print "===============Allocated memory info(in block pool: &tx_block_pool_name, &ppool_ctl_block)==============="
+print "     No.    Size  Entity_ID    FileName    (Line)     Addr  Subscript"
+
+&which=0
+&ptr=(&tx_block_pool_start+((&which)*(&block_size))+4)
+
+CMM_LOOP_BLOCK_POOL:
+
+&user_ptr=v.value((&tx_block_pool_start)+((&which)*(&block_size))+4+sizeof(osa_buff_hdr_struct))
+&pre=v.value(((osa_buff_hdr_struct*)&ptr)->pre)
+&succ=v.value(((osa_buff_hdr_struct*)&ptr)->succ)
+&alloc_ent_id=v.value(((osa_buff_hdr_struct*)&ptr)->alloc_ent_id)
+&num=format.decimal(8,v.value(((osa_buff_hdr_struct*)&ptr)->block_num))
+&size=format.decimal(8,v.value(((osa_buff_hdr_struct*)&ptr)->size))
+&entity=data.string(d:v.value(entity_name[&alloc_ent_id]))
+&line=format.decimal(8,v.value(((osa_buff_hdr_struct*)&ptr)->line))
+&pool_id=v.value(((osa_buff_hdr_struct*)&ptr)->pool_id)
+&which_pos=format.decimal(0,v.value(&(which)))
+
+; var.print *((osa_buff_hdr_struct*)&ptr)
+
+if (&pre!=0&&&succ!=0)
+(
+  ; ENTITY_INFRA ... 
+  if (&alloc_ent_id==&ENTITY_INFRA)||(&alloc_ent_id==&ENTITY_STACK)||(&alloc_ent_id==&ENTITY_GSM_STACK)||(&alloc_ent_id==&ENTITY_W_STACK)||(&alloc_ent_id==&ENTITY_SIGNAL)||(&alloc_ent_id==&ENTITY_TD_LTE_STACK)||(&alloc_ent_id==&ENTITY_IMS_STACK)||(&alloc_ent_id==&ENTITY_NR_STACK)
+  (
+    ;&file=data.string(d:v.value(((osa_buff_hdr_struct*)&ptr)->file_code))
+    &file=format.decimal(8,v.value(((osa_buff_hdr_struct*)&ptr)->file_code))
+    print  "&(num) &(size) &(entity) &(file) &(line) &(ptr) [&which_pos]"
+  )
+  
+  ; ENTITY_OSA, ENTITY_USER
+  if (&alloc_ent_id==&ENTITY_OSA)||(&alloc_ent_id==&ENTITY_USER)
+  (
+    &tmp1=v.value(((osa_buff_hdr_struct*)&ptr)->alloc_id)
+    &tmp1_tmp=&tmp1*0x1000000
+    &tmp2=v.value(((osa_buff_hdr_struct*)&ptr)->file_ent_id)
+    &tmp2_tmp=&tmp2*0x10000
+    &tmp3=v.value(((osa_buff_hdr_struct*)&ptr)->file_code)
+    &tmp4=&(tmp1_tmp)+&(tmp2_tmp)+&(tmp3)
+    &file=data.string(d:&tmp4)
+    print  "&(num) &(size) &(entity) &(file) &(line) &(ptr) [&which_pos]"
+  )
+)
+  
+&which=&which+1
+&ptr=v.value((&tx_block_pool_start)+((&which)*(&block_size))+4)
+if ((v.value(&ptr)>=v.value(&tx_block_pool_start))&&(v.value(&ptr)<=v.value(&tx_block_pool_end)))
+(
+  goto CMM_LOOP_BLOCK_POOL
+)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  End                                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_FILE_CLOSE:
+print ""
+area.close output_file_win
+area.clear output_file_win
+
+type "&output_file_path"
+
+CMM_END:
+area.select logging_win
+
+print ""
+print "End time : " clock.date() "  " clock.time() "  "
+
+; Close the logging output window
+; wait 1s
+if (&err==0)
+(
+  area.close logging_win
+  do "&curr_script_dir\_trace32_area_delete.cmm" "logging_win"
+)
+
+enddo
+

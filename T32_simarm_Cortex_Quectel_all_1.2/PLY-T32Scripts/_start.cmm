@@ -1,0 +1,293 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Startup Component                                                                                     ;;
+;;                                                                                                        ;;
+;;    TODO                                                                                                ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;  2021/09/07      Yi.Yang                     Add CM4                                                   ;;
+;;																										  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; CLI args
+global &_global_cli_quiet &_global_cli_product &_global_cli_cpu_num &_global_cli_axf &_global_cli_mem &_global_cli_begin_address &_global_cli_working_dir
+
+&cli_quiet="&_global_cli_quiet"
+&cli_product="&_global_cli_product"
+&cli_cpu_num="&_global_cli_cpu_num"
+&cli_axf="&_global_cli_axf"
+&cli_mem="&_global_cli_mem"
+&cli_begin_address="&_global_cli_begin_address"
+&cli_working_dir="&_global_cli_working_dir"
+
+&_global_cli_quiet=""
+&_global_cli_product=""
+&_global_cli_cpu_num=""
+&_global_cli_axf=""
+&_global_cli_mem=""
+&_global_cli_begin_address=""
+&_global_cli_working_dir=""
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Init                                                                                                  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+WINPAGE.RESET
+WINCLEAR
+
+; os.ppd() : current script dir
+; os.psd() : T32 root dir
+; os.pwd() : working dir
+
+; Set the PLY script directory
+global &_global_PLY_script_dir
+&_global_PLY_script_dir=os.ppd()
+&curr_script_dir=os.ppd()
+
+; get remote & current versions
+global &_global_remote_version &_global_curr_version
+do "&curr_script_dir\_version_get_ver.cmm"
+
+; Add menus
+do "&curr_script_dir\_menu_PLY.cmm"
+
+; Add upgrade menu if new version found
+if ("&_global_remote_version"!=""&&"&_global_remote_version"!="&_global_curr_version")
+(
+  if ("&cli_quiet"!="1")
+  (
+    LOCAL &result
+    DIALOG.YESNO "Find new version [&_global_remote_version], do you want to upgrade?"
+    ENTRY &result
+    IF &result
+    (
+     do "&curr_script_dir\_version_upgrade.cmm"
+    ) 
+  )
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Startup                                                                                               ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Create the new window
+area.create startup_win 200. 500.
+area.select startup_win
+area.view startup_win
+
+; Select product
+global &_global_product_id
+global &_global_product_name
+global &_global_cpu_num
+if ("&cli_cpu_num"!="")
+(
+  &_global_cpu_num=v.value("&cli_cpu_num")
+)
+else
+(
+  &_global_cpu_num=1
+)
+
+if ("&cli_product"!="")
+(
+  &_global_product_id=v.value("&cli_product")
+)
+else
+(
+  print "The supported products:"
+  print "  0: ORCA"
+  print "  1: SHARKLE/SHARKL5/SHARKL5PRO"
+  print "  2: W317/T117"
+  print "  3: SHARKL6PRO"
+  print "  4: QogirN6Lite"
+  print "  5: Manual for others"
+  print "  6: minidump"
+  print "  7: cm4"
+  print "Please select the product [*0]: "
+  enter &_global_product_id
+)
+if ("&_global_product_id"!="")
+(
+  &_global_product_id=v.value(&_global_product_id)
+  if (v.value(&_global_product_id)==v.value("0"))
+  (
+    &_global_product_name="ORCA"
+  )
+  else if (v.value(&_global_product_id)==v.value("1"))
+  (
+    &_global_product_name="SHARKLE/SHARKL5/SHARKL5PRO"
+  )
+  else if (v.value(&_global_product_id)==v.value("2"))
+  (
+    &_global_product_name="W317/T117"
+  )
+  else if (v.value(&_global_product_id)==v.value("3"))
+  (
+    &_global_product_name="SHARKL6PRO"
+  )
+  else if (v.value(&_global_product_id)==v.value("4"))
+  (
+    &_global_product_name="QogirN6Lite"
+  )
+  else if (v.value(&_global_product_id)==v.value("5"))
+  (
+    &_global_product_name="Manual for others"
+  )
+  else if (v.value(&_global_product_id)==v.value("6"))
+  (
+    &_global_product_name="minidump"
+  )
+  else if (v.value(&_global_product_id)==v.value("7"))
+  (
+	&_global_product_name="cm4"
+  )
+)
+else
+(
+  &_global_product_id=v.value("0")
+  &_global_product_name="ORCA"
+)
+
+print "You are choosing " format.decimal(0, v.value(&_global_product_id)) " - &_global_product_name product!"
+
+; Loading AXF & memory accordding to the memory layout of the product.
+&res=false()
+if ("&_global_product_name"=="ORCA")
+(
+  do "&curr_script_dir\_product_cfg_cpu_orca.cmm" "&cli_axf" "&cli_mem" "&cli_begin_address" "&cli_working_dir"
+  entry &res
+)
+else if ("&_global_product_name"=="SHARKLE/SHARKL5/SHARKL5PRO")
+(
+  do "&curr_script_dir\_product_cfg_cpu_sharkle.cmm" "&cli_axf" "&cli_mem" "&cli_begin_address" "&cli_working_dir"
+  entry &res
+)
+else if ("&_global_product_name"=="W317/T117")
+(
+  do "&curr_script_dir\_product_cfg_cpu_w317.cmm" "&cli_axf" "&cli_mem" "&cli_begin_address" "&cli_working_dir"
+  entry &res
+)
+else if ("&_global_product_name"=="SHARKL6PRO")
+(
+  do "&curr_script_dir\_product_cfg_cpu_sharkl6pro.cmm" "&cli_axf" "&cli_mem" "&cli_begin_address" "&cli_working_dir"
+  entry &res
+)
+else if ("&_global_product_name"=="QogirN6Lite")
+(
+  do "&curr_script_dir\_product_cfg_cpu_QogirN6Lite.cmm" "&cli_axf" "&cli_mem" "&cli_begin_address" "&cli_working_dir"
+  entry &res
+)
+else if ("&_global_product_name"=="Manual for others")
+(
+  do "&curr_script_dir\_product_cfg_cpu_manual.cmm"
+  entry &res
+)
+else if ("&_global_product_name"=="minidump")
+(
+  do "&curr_script_dir\_product_cfg_cpu_manual_minidump.cmm"
+  entry &res
+)
+else if ("&_global_product_name"=="cm4")
+(
+  do "&curr_script_dir\_product_cfg_cpu_manual_cm4.cmm"
+  entry &res
+)
+else
+(
+  goto CMM_END
+)
+if (!&res)
+(
+  goto CMM_ERROR_END
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Save user input to cmm file.                                                                          ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+if ("&cli_axf"==""&&"&cli_mem"=="")
+(
+  global &_global_axf_file_path &_global_mem_file_path &_global_working_dir
+  &bug_bat="&_global_working_dir/bug.bat"
+  &bug_cmm="&_global_working_dir/bug.cmm"
+  if !os.file("&_global_product_name"!="cm4" && "&bug_bat")
+  (
+    open #1 "&bug_bat" /create
+    write #1 os.pef() " -s " "&bug_cmm"
+    close #1
+  )
+  if !os.file("&_global_product_name"!="cm4" && "&bug_cmm")
+  (
+    open #1 "&bug_cmm" /create
+    write #1 "global &" "_global_cli_quiet &" "_global_cli_product &" "_global_cli_cpu_num &" "_global_cli_axf &" "_global_cli_mem &" "_global_cli_begin_address &" "_global_cli_working_dir"
+    write #1 ""
+    write #1 "&" "_global_cli_quiet="
+    write #1 "&" "_global_cli_product=" format.char(0x22, 1., ' ') "&_global_product_id" format.char(0x22, 1., ' ')
+    write #1 "&" "_global_cli_axf=" format.char(0x22, 1., ' ') "&_global_axf_file_path" format.char(0x22, 1., ' ')
+    write #1 "&" "_global_cli_mem=" format.char(0x22, 1., ' ') "&_global_mem_file_path" format.char(0x22, 1., ' ')
+    write #1 "&" "_global_cli_working_dir=" format.char(0x22, 1., ' ') "&_global_working_dir" format.char(0x22, 1., ' ')
+    write #1 "do " format.char(0x22, 1., ' ') "&curr_script_dir/_start.cmm" format.char(0x22, 1., ' ')
+    write #1 "do " format.char(0x22, 1., ' ') "&curr_script_dir/_auto_analyze_assert.cmm" format.char(0x22, 1., ' ') " " format.char(0x22, 1., ' ') "&_global_working_dir/a.log" format.char(0x22, 1., ' ')
+    write #1 ";quit"
+    close #1
+  )
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Show default windows                                                                                  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;WINPAGE.RESET
+;WINCLEAR
+
+if (v.value(&_global_cpu_num)==v.value("1"))
+(
+  VAR.FRAME /LOCALS /CALLER /ARGS
+  Data.List
+  Register
+)
+else
+(
+  &core_index=0
+  while (v.value(&core_index)<v.value(&_global_cpu_num))
+  (
+    VAR.FRAME /LOCALS /CALLER /ARGS /CORE &core_index
+    Data.List /CORE &core_index
+    Register /CORE &core_index
+    &core_index=&core_index+1
+  )
+)
+
+;WINPAGE.SELECT P000 
+
+if ("&_global_product_name"!="cm4")
+(
+  do "&curr_script_dir\_arm_show_core_state.cmm" "&cli_quiet"
+)
+
+CMM_END:
+do "&curr_script_dir\_trace32_area_delete.cmm" "startup_win"
+
+CMM_ERROR_END:
+enddo
+
+

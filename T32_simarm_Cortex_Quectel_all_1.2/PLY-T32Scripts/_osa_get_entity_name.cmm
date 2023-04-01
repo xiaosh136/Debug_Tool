@@ -1,0 +1,96 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  OSA Component                                                                                         ;;
+;;                                                                                                        ;;
+;;    OSA : Get Entity Name                                                                            ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+global &ENTITY_INFRA &ENTITY_STACK &ENTITY_GSM_STACK &ENTITY_W_STACK &ENTITY_SIGNAL
+global &ENTITY_TD_LTE_STACK &ENTITY_IMS_STACK &ENTITY_NR_STACK
+global &ENTITY_PSEUDO_START &ENTITY_OSA &ENTITY_USER &ENTITY_LAST &ENTITY_KAL
+
+entry &caller_entity_id
+
+; remove \"\"
+&caller_entity_id=&caller_entity_id
+
+;PMACRO.list
+local &err
+&err=0
+&curr_script_dir=os.ppd()
+
+;
+&find_entity_name=""
+if (&caller_entity_id==&ENTITY_OSA)
+(
+  &find_entity_name="ENTITY_OSA"
+)
+else if (&caller_entity_id==&ENTITY_USER)
+(
+  &find_entity_name="ENTITY_USER"
+)
+else if (&caller_entity_id==&ENTITY_LAST)
+(
+  &find_entity_name="ENTITY_LAST"
+)
+else if (&caller_entity_id==&ENTITY_KAL)
+(
+  &find_entity_name="ENTITY_KAL"
+)
+else if (&caller_entity_id==&ENTITY_INFRA)
+(
+  &find_entity_name="ENTITY_INFRA"
+)
+else if (&caller_entity_id==&ENTITY_STACK)
+(
+  &find_entity_name="ENTITY_STACK"
+)
+else if (&caller_entity_id==&ENTITY_GSM_STACK)
+(
+  &find_entity_name="ENTITY_GSM_STACK"
+)
+else if (&caller_entity_id==&ENTITY_W_STACK)
+(
+  &find_entity_name="ENTITY_W_STACK"
+)
+else if (&caller_entity_id==&ENTITY_SIGNAL)
+(
+  &find_entity_name="ENTITY_SIGNAL"
+)
+else if (&caller_entity_id==&ENTITY_TD_LTE_STACK)
+(
+  &find_entity_name="ENTITY_TD_LTE_STACK"
+)
+else if (&caller_entity_id==&ENTITY_IMS_STACK)
+(
+  &find_entity_name="ENTITY_IMS_STACK"
+)
+else if (&caller_entity_id==&ENTITY_NR_STACK)
+(
+  &find_entity_name="ENTITY_NR_STACK"
+)
+
+enddo &find_entity_name
+

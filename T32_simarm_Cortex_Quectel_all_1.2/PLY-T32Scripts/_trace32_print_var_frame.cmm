@@ -1,0 +1,66 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  TRACE32 Component                                                                                     ;;
+;;                                                                                                        ;;
+;;    TRACE32: Get the thread entry.                                                                      ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+local &caller_export_v_f_file &caller_core_index &caller_core_num &caller_print_prefix
+entry &caller_export_v_f_file &caller_core_index &caller_core_num &caller_print_prefix
+
+; remove \"\"
+&caller_export_v_f_file=&caller_export_v_f_file
+&caller_core_index=&caller_core_index
+&caller_core_num=&caller_core_num
+&caller_print_prefix=&caller_print_prefix
+
+;PMACRO.list
+local &err
+&err=0
+&curr_script_dir=os.ppd()
+&export_dir="&_global_export_dir"
+if ("&caller_export_v_f_file"=="")
+(
+  &caller_export_v_f_file="&export_dir\v.f.txt"
+)
+
+; v.f to file
+do "&curr_script_dir\_trace32_var_frame.cmm" "&caller_export_v_f_file" "&caller_core_index" "&caller_core_num"
+
+; print v.f file
+local &myline
+open #1 "&caller_export_v_f_file" /read
+read #1 %line &myline
+while !file.eof(1)
+(
+  print "&caller_print_prefix&myline"
+  read #1 %line &myline
+)
+close #1
+
+CMM_END:
+
+enddo

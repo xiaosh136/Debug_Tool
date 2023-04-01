@@ -1,0 +1,168 @@
+; --------------------------------------------------------------------------------
+; @Title: Script File to load ETB raw data in the TRACE32 Simulator
+; @Description: 
+;   This script loads the ETB raw data in the TRACE32 Simulator.
+;   You need to edit the script to setup exactely the same ETM
+;   configuration used when the trace data has been generated.
+;   Otherwhise the raw data cannot be correctly decoded.
+; @Keywords: ETB, raw, simulator, trace
+; @Author: -
+; @Copyright: (C) 1989-2014 Lauterbach GmbH, licensed for use with TRACE32(R) only
+; --------------------------------------------------------------------------------
+; $Id: etb_sim_import.cmm 6904 2014-04-21 15:16:07Z kjmal $
+
+Start:
+;Create the new window
+Area.Reset
+Area.Create SPRDIO 200. 500.
+Area.Select SPRDIO
+Area SPRDIO
+
+;Select sys ID
+print "Select sys ID ... "
+print "             0: PS CP"
+print "             1: PHY CP"
+
+GLOBAL &sys_id
+print "Enter the SYS ID to attach(from 0-1):"
+enter &sys_id
+
+SYSTEM.CPU CORTEXR8MPCore
+SYStem.CONFIG.CoreNumber 2.
+CORE.ASSIGN 1. 2.
+
+; set any address here to enable the ETM in TRACE32
+SYStem.CONFIG ETMBASE 1000
+SYStem.CONFIG TPIU.Base 2000
+SYStem.Up
+	
+
+local &region_name
+local &sys_name
+if &sys_id==0
+(
+	&region_name="PSCP_mem"
+	&sys_name="PSCP_modem"
+)
+else if &sys_id==1
+(
+	&region_name="PHYCP_mem"
+	&sys_name="PHYCP_phy"
+)
+
+GLOBAL &FilePath
+
+LOCAL &CUR_DIR
+LOCAL &T32_ROOT_DIR
+&CUR_DIR=OS.PPD()
+&T32_ROOT_DIR=OS.PSD()
+
+print "Select AXF file... "
+d.load "&CUR_DIR\*.axf"
+
+local &sys_mem_start_addr
+local &sys_mem_len
+
+&sys_mem_start_addr=0x88000000
+
+print "Select mem file..."
+d.load.binary "&CUR_DIR\*.mem" &sys_mem_start_addr /noclear
+
+&MODEM_Global_address=0x88000000
+&MODEM_Global_offset=0x00000000
+&MODEM_Global_len=0x22000000
+
+&PSCP_AON_IRAM_address=0x00000000
+&PSCP_AON_IRAM_offset=0x22000000
+&PSCP_AON_IRAM_len=0x00001000
+
+&PSCP_LLRAM_address=0x54100000
+&PSCP_LLRAM_offset=0x22001000
+&PSCP_LLRAM_len=0x00040000
+
+&PHYCP_LLRAM_address=0x41000000
+&PHYCP_LLRAM_offset=0x22041000
+&PHYCP_LLRAM_len=0x00100000
+
+&SIPC_MEM_address=0x87800000
+&SIPC_MEM_offset=0x22141000
+&SIPC_MEM_len=0x00800000
+
+&ps_cp_thread_info_address=0x9807AEA4
+&ps_cp_thread_info_offset=0x22941000
+&ps_cp_thread_info_len=0x00004000
+
+&AON_MAILBOX_INPUT_address=0x64600000
+&AON_MAILBOX_INPUT_offset=0x22945000
+&AON_MAILBOX_INPUT_len=0x00010000
+
+&AON_MAILBOX_OUTPUT_address=0x64610000
+&AON_MAILBOX_OUTPUT_offset=0x22955008
+&AON_MAILBOX_OUTPUT_len=0x00010000
+
+&PMU_APB_POWER_address=0x6491051C
+&PMU_APB_POWER_offset=0x22965010
+&PMU_APB_POWER_len=0x00000018
+
+&PMU_PSCP_INT_DISABLE_address=0x649107F0
+&PMU_PSCP_INT_DISABLE_offset=0x22965030
+&PMU_PSCP_INT_DISABLE_len=0x00000004
+
+&PMU_PHYCP_INT_DISABLE_address=0x64910264
+&PMU_PHYCP_INT_DISABLE_offset=0x2296503C
+&PMU_PHYCP_INT_DISABLE_len=0x00000004
+
+&AON_APB_DEBUG_address=0x64900CF4
+&AON_APB_DEBUG_offset=0x22965048
+&AON_APB_DEBUG_len=0x00000008
+
+&AHB_REG_address=0x54000000
+&AHB_REG_offset=0x22965058
+&AHB_REG_len=0x000001FC
+
+&APB_REG_address=0x54900000
+&APB_REG_offset=0x2296525C
+&APB_REG_len=0x00000024
+
+;GOSUB LOAD_RAM "MODEM_Global" &MODEM_Global_address &MODEM_Global_offset &MODEM_Global_len
+GOSUB LOAD_RAM "PSCP_AON_IRAM" &PSCP_AON_IRAM_address &PSCP_AON_IRAM_offset &PSCP_AON_IRAM_len
+GOSUB LOAD_RAM "PSCP_LLRAM" &PSCP_LLRAM_address &PSCP_LLRAM_offset &PSCP_LLRAM_len
+GOSUB LOAD_RAM "PHYCP_LLRAM" &PHYCP_LLRAM_address &PHYCP_LLRAM_offset &PHYCP_LLRAM_len
+GOSUB LOAD_RAM "SIPC_MEM" &SIPC_MEM_address &SIPC_MEM_offset &SIPC_MEM_len
+GOSUB LOAD_RAM "ps_cp_thread_info" &ps_cp_thread_info_address &ps_cp_thread_info_offset &ps_cp_thread_info_len
+GOSUB LOAD_RAM "AON_MAILBOX_INPUT" &AON_MAILBOX_INPUT_address &AON_MAILBOX_INPUT_offset &AON_MAILBOX_INPUT_len
+GOSUB LOAD_RAM "AON_MAILBOX_OUTPUT" &AON_MAILBOX_OUTPUT_address &AON_MAILBOX_OUTPUT_offset &AON_MAILBOX_OUTPUT_len
+GOSUB LOAD_RAM "PMU_APB_POWE" &PMU_APB_POWER_address &PMU_APB_POWER_offset &PMU_APB_POWER_len
+GOSUB LOAD_RAM "PMU_PSCP_INT_DISABLE" &PMU_PSCP_INT_DISABLE_address &PMU_PSCP_INT_DISABLE_offset &PMU_PSCP_INT_DISABLE_len
+GOSUB LOAD_RAM "PMU_PHYCP_INT_DISABLE" &PMU_PHYCP_INT_DISABLE_address &PMU_PHYCP_INT_DISABLE_offset &PMU_PHYCP_INT_DISABLE_len
+GOSUB LOAD_RAM "AON_APB_DEBUG" &AON_APB_DEBUG_address &AON_APB_DEBUG_offset &AON_APB_DEBUG_len
+GOSUB LOAD_RAM "AHB_REG" &AHB_REG_address &AHB_REG_offset &AHB_REG_len
+GOSUB LOAD_RAM "APB_REG" &APB_REG_address &APB_REG_offset &APB_REG_len
+	
+; ETM Settings, Please note that these settings must match the used ETM settings
+; when recording the trace. Otherwhise, the displayed trace here could contain 
+; erros.
+	ETM.PortSize 32.
+	ETM.ContextID OFF
+;	ETM.PortMode  Normal
+	tpiu.portmode wrapped	
+	ETM.DataTrace OFF
+	
+; Import trace data
+	LA.Mode FLOWTRACE ON
+;	LA.IMPORT.ETB *.log
+    LA.IMPORT.ETB *.bin
+	LA.List
+	
+	ENDDO
+	
+
+
+LOAD_RAM:
+	ENTRY &ram_name &ram_start_addr &ram_offset &ram_len
+	
+	d.save.binary "&CUR_DIR\&ram_name.bin" (&sys_mem_start_addr+&ram_offset)++(&ram_len-1)
+	d.load.Binary "&CUR_DIR\&ram_name.bin" &ram_start_addr /NoClear
+	DEL "&CUR_DIR\&ram_name.bin"
+
+	RETURN

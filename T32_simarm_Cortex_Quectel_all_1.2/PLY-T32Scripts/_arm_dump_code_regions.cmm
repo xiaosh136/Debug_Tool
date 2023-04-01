@@ -1,0 +1,177 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  ARM Component                                                                                         ;;
+;;                                                                                                        ;;
+;;    Dump the code segment in RAM into the HOST file.                                                    ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/06/19      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Create logging output window
+area.reset
+area.create logging_win 200. 500.
+area.select logging_win
+area.view logging_win
+
+;PMACRO.list
+local &err
+&err=0
+
+; Enter the export directory if null
+global &_global_export_dir
+&curr_script_dir=os.ppd()
+do "&curr_script_dir\_setting_input_export_dir_if_null.cmm"
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+
+; Makeup output file path
+local &output_file_name
+local &core_name
+if symbol.exist(LOG_magicHeader)
+(
+  &core_name=data.string(d:v.value(LOG_magicHeader.coreName))
+  &output_file_name="arm_code_region_&(core_name)"
+)
+else
+(
+  &output_file_name="arm_code_region"
+)
+
+print "Export to directory : &(export_dir)"
+print "Start time : " clock.date() "  " clock.time() "  ..."
+print ""
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Start ...                                                                                             ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+if !(symbol.exist(mem_cfg))
+(
+  &err=1
+  print "Error: `mem_cfg' does not exist. EXIT script"
+  goto CMM_END
+)
+
+local &kennel_addr
+local &kernel_size
+local &kernel_name
+
+&mem_cfg_index=0
+&mem_cfg_cnt=v.value("sizeof(mem_cfg)/sizeof(mem_cfg[0])")
+
+CMM_LOOP:
+
+&kernel_name=data.string(d:v.value(mem_cfg[&mem_cfg_index].name))
+&kennel_addr=v.value(mem_cfg[&mem_cfg_index].start)
+&kernel_size=v.value(mem_cfg[&mem_cfg_index].size)
+
+if ("&kernel_name"!="EXEC_KERNEL_IMAGE")&&("&kernel_name"!="EXEC_KERNEL_IMAGE0")
+(
+  &mem_cfg_index=&mem_cfg_index+1
+  if (&mem_cfg_index<&mem_cfg_cnt)
+    goto CMM_LOOP
+  
+  &err=1
+  area.select logging_win
+  print "Error: `EXEC_KERNEL_IMAGE' region does not exist. EXIT script"
+  goto CMM_END
+)
+
+print "KERNEL address: &kennel_addr, KERNEL size (bytes): &kernel_size from @mem_cfg[1] (&kernel_name)"
+
+print "data.save.binary &export_dir\&(output_file_name)_execregion_&(kernel_name)_&(kennel_addr)++&(kernel_size).bin &(kennel_addr)++&(kernel_size)"
+data.save.binary &export_dir\&(output_file_name)_execregion_&(kernel_name)_&(kennel_addr)++&(kernel_size).bin &(kennel_addr)++&(kernel_size)
+
+if symbol.exist(LOG_magicHeader)
+(
+  &core_name=data.string(d:v.value(LOG_magicHeader.coreName))
+  if "&core_name"=="V3-PHY"
+  (
+    ;&tcm_code_addr=0x9afe3000
+    ;&tcm_code_size=0x0001d000
+    &tcm_code_addr=0x98fe2800
+    &tcm_code_size=0x0001d800
+    
+    ;#define MEM_CFG_V3PHY_MEM_BASE_ADDR  (0x99000000)
+    ;#define MEM_PHY_BASE_ADDR            (MEM_CFG_V3PHY_MEM_BASE_ADDR)
+    ;#define MEM_TCM_START_ADDR           (MEM_PHY_BASE_ADDR - 0x00020000)
+    ;Load Region LOAD_KERNEL_IMAGE (Base: 0x99000000, Size: 0x0040ed38, Max: 0x00f00000, ABSOLUTE, COMPRESSED[0x003ec070])
+    ;Execution Region MEM_INFO_AREA (Base: 0x99000000, Size: 0x00000600, Max: 0x00000600, ABSOLUTE)
+    ;Execution Region EXEC_KERNEL_IMAGE0 (Base: 0x99000600, Size: 0x00339280, Max: 0x003ffa00, ABSOLUTE)
+    ;Execution Region TCM_DATA (Base: 0x98fe0000, Size: 0x00002698, Max: 0x00002800, ABSOLUTE)
+    ;Execution Region TCM_CODE (Base: 0x98fe2800, Size: 0x0001d6fc, Max: 0x0001d800, ABSOLUTE)
+    
+    &EXEC_KERNEL_IMAGE0_Base=v.value(&Image$$EXEC_KERNEL_IMAGE0$$Base)
+    &MEM_INFO_AREA_Base=&EXEC_KERNEL_IMAGE0_Base-0x600
+    &MEM_PHY_BASE_ADDR=&MEM_INFO_AREA_Base
+    &MEM_TCM_START_ADDR=v.value(&MEM_PHY_BASE_ADDR-0x00020000)
+    &TCM_DATA_Base=&MEM_TCM_START_ADDR
+    &TCM_DATA_Size=0x00002800
+    &TCM_CODE_Base=v.value(&TCM_DATA_Base+&TCM_DATA_Size)
+    &TCM_CODE_Size=v.value(0x00020000-&TCM_DATA_Size)
+    
+    &tcm_code_addr=&TCM_CODE_Base
+    &tcm_code_size=&TCM_CODE_Size
+    
+    print "data.save.binary &export_dir\&(output_file_name)_execregion_TCM_CODE_&(tcm_code_addr)++&(tcm_code_size).bin &(tcm_code_addr)++&(tcm_code_size)"
+    data.save.binary &export_dir\&(output_file_name)_execregion_TCM_CODE_&(tcm_code_addr)++&(tcm_code_size).bin &(tcm_code_addr)++&(tcm_code_size)
+    
+    &tcm_memory_save_area_addr=v.value(&tcm_memory_save_area)
+    &tcm_memory_save_area_size=v.value(sizeof(tcm_memory_save_area))
+    &tcm_memory_save_area_CODE_addr=v.value(&tcm_memory_save_area_addr+&TCM_DATA_Size)
+    &tcm_memory_save_area_CODE_size=&TCM_CODE_Size
+    
+    print "data.save.binary &export_dir\&(output_file_name)_tcm_memory_save_area_CODE_&(tcm_memory_save_area_CODE_addr)++&(tcm_memory_save_area_CODE_size).bin &(tcm_memory_save_area_CODE_addr)++&(tcm_memory_save_area_CODE_size)"
+    data.save.binary &export_dir\&(output_file_name)_tcm_memory_save_area_CODE_&(tcm_memory_save_area_CODE_addr)++&(tcm_memory_save_area_CODE_size).bin &(tcm_memory_save_area_CODE_addr)++&(tcm_memory_save_area_CODE_size)
+    
+  )
+)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  End                                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_FILE_CLOSE:
+print ""
+type "&export_dir\&(output_file_name)_execregion_&(kernel_name)_&(kennel_addr)++&(kernel_size).bin"
+
+CMM_END:
+area.select logging_win
+
+print ""
+print "End time : " clock.date() "  " clock.time() "  "
+
+; Close the logging output window
+; wait 1s
+if (&err==0)
+(
+  area.close logging_win
+  area.reset
+)
+
+enddo

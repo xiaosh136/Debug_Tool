@@ -1,0 +1,204 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  LOG Component                                                                                         ;;
+;;                                                                                                        ;;
+;;    LOG : Save the channel buffer track info into the HOST file.                                        ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; Create logging output window
+area.create logging_win 200. 500.
+area.select logging_win
+area.view logging_win
+
+;PMACRO.list
+local &err
+&err=0
+
+; Enter the export directory if null
+global &_global_export_dir
+&curr_script_dir=os.ppd()
+do "&curr_script_dir\_setting_input_export_dir_if_null.cmm"
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+
+; Makeup output file path
+local &output_file_path
+local &output_file_name
+local &core_name
+if symbol.exist(LOG_magicHeader)
+(
+  &core_name=data.string(d:v.value(LOG_magicHeader.coreName))
+  &output_file_name="log_chan_buf_tracks_&(core_name).txt"
+)
+else
+(
+  &output_file_name="log_chan_buf_tracks.txt"
+)
+&output_file_path="&(export_dir)/&output_file_name"
+
+print "Export to directory : &(export_dir)"
+print "Start time : " clock.date() "  " clock.time() "  ..."
+print ""
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Start ...                                                                                             ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+if !(symbol.exist(chan_tracks))
+(
+  &err=1
+  print "Error: `chan_tracks' does not exist. EXIT script"
+  goto CMM_END
+)
+
+; Create output file
+area.create output_file_win 200. 500.
+area.open output_file_win "&output_file_path"
+area.select output_file_win
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  CHAN TRACK INFO                                                                                       ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &chan_track_index &chan_track_total_size &chan_track_total_cnt
+&chan_tracks=v.value(chan_tracks)
+&chan_track_index=v.value(chan_track_index)
+&chan_track_total_size=y.sizeof(chan_tracks)
+&chan_track_total_cnt=y.sizeof(chan_tracks)/0x10
+&chan_track_i=&chan_track_index
+&curr_buf=0
+&curr_data=0
+
+&CBTO_INITIAL=0x0
+&CBTO_ENCODER_GET_BUFF=0x1
+&CBTO_ENCODER_SEND_BUFF=0x2
+&CBTO_TRANSPORT_TASK_SEND_OK=0x3
+&CBTO_TRANSPORT_TASK_SEND_FAILURE=0x4
+&CBTO_TRANSPORT_SEND_POLLING=0x5
+&CBTO_TRANSPORT_FLUSH=0x6
+
+print "===============Chan Track info==============="
+print " Index  Opr                ChanBuf    ShareMem   UserData"
+
+CMM_LOOP_1:
+&index=format.decimal(4,v.value(&chan_track_i))
+&op=v.value((((struct ChannelBufferTrack*)&chan_tracks)[&chan_track_i]).op)
+&op_fmt=format.decimal(4,v.value(&op))
+&buf=v.value((((struct ChannelBufferTrack*)&chan_tracks)[&chan_track_i]).buf)
+&buf_fmt=format.hex(8,v.value(&buf))
+&data=v.value((((struct ChannelBufferTrack*)&chan_tracks)[&chan_track_i]).data)
+&data_fmt=format.hex(8,v.value(&data))
+&user_data=v.value((((struct ChannelBufferTrack*)&chan_tracks)[&chan_track_i]).user_data)
+&user_data_fmt=format.hex(8,v.value(&user_data))
+&op_name=""
+&to_send=""
+if (&op==&CBTO_INITIAL)
+(
+  &op_name="[    initial    ]"
+)
+else if (&op==&CBTO_ENCODER_GET_BUFF)
+(
+  &op_name="[    get-buf    ]"
+  &to_send=&curr_buf
+  &curr_buf=&buf
+  &curr_data=&data
+)
+else if (&op==&CBTO_ENCODER_SEND_BUFF)
+(
+  &op_name="[    snd-buf    ]"
+)
+else if (&op==&CBTO_TRANSPORT_TASK_SEND_OK)
+(
+  &op_name="[  task-send-ok ]"
+)
+else if (&op==&CBTO_TRANSPORT_TASK_SEND_FAILURE)
+(
+  &op_name="[ task-send-fail]"
+)
+else if (&op==&CBTO_TRANSPORT_SEND_POLLING)
+(
+  &op_name="[  send-polling ]"
+)
+else if (&op==&CBTO_TRANSPORT_FLUSH)
+(
+  &op_name="[     flush     ]"
+)
+
+if (&op==&CBTO_ENCODER_GET_BUFF)
+(
+  print  "&index &op_fmt&op_name 0x&(buf_fmt) 0x&(data_fmt) 0x&(user_data_fmt) [to send: &to_send]"
+)
+else if (&op==&CBTO_ENCODER_SEND_BUFF)
+(
+  print  "&index &op_fmt&op_name 0x&(buf_fmt) 0x&(data_fmt) 0x&(user_data_fmt) [   send: &buf]"
+)
+else
+(
+  print  "&index &op_fmt&op_name 0x&(buf_fmt) 0x&(data_fmt) 0x&(user_data_fmt)"
+)
+
+&chan_track_i=&chan_track_i+1
+if (&chan_track_i==&chan_track_total_cnt)
+(
+  &chan_track_i=0
+)
+if (&chan_track_i!=&chan_track_index)
+(
+	goto CMM_LOOP_1
+)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  End                                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_FILE_CLOSE:
+print ""
+area.close output_file_win
+area.clear output_file_win
+
+type "&output_file_path"
+
+CMM_END:
+area.select logging_win
+
+print ""
+print "End time : " clock.date() "  " clock.time() "  "
+
+; Close the logging output window
+; wait 1s
+if (&err==0)
+(
+  area.close logging_win
+  do "&curr_script_dir\_trace32_area_delete.cmm" "logging_win"
+)
+
+enddo

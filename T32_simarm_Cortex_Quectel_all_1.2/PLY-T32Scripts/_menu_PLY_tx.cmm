@@ -1,0 +1,104 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Menu Component                                                                                        ;;
+;;                                                                                                        ;;
+;;    PLY Menu : TX                                                                                       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; Set the PLY script directory
+global &_global_PLY_script_dir
+&_global_PLY_script_dir=os.ppd()
+&curr_script_dir=os.ppd()
+
+MENU.ReProgram
+(
+  ADD
+  MENU
+  (
+    POPUP "[[Pizer Love You!]"
+    (
+      POPUP "TX"
+      (
+        ; Export Threads to File
+        MENUITEM "[:plist]Export Threads to File"
+        (
+          do "&_global_PLY_script_dir\_tx_export_threads.cmm"
+        )
+        
+        ; Export Mutexes to File
+        MENUITEM "[:plist]Export Mutexes to File"
+        (
+          do "&_global_PLY_script_dir\_tx_export_mutexes.cmm"
+        )
+        
+        ; Export Semaphores to File
+        MENUITEM "[:plist]Export Semaphores to File"
+        (
+          do "&_global_PLY_script_dir\_tx_export_sems.cmm"
+        )
+        
+        ; Export Event Flags to File
+        MENUITEM "[:plist]Export Event Flags to File"
+        (
+          do "&_global_PLY_script_dir\_tx_export_event_flags.cmm"
+        )
+        
+        ; Export Queues to File
+        MENUITEM "[:plist]Export Queues to File"
+        (
+          do "&_global_PLY_script_dir\_tx_export_queues.cmm"
+        )
+        
+        ; Export Timers to File
+        MENUITEM "[:plist]Export Timers to File"
+        (
+          do "&_global_PLY_script_dir\_tx_export_timers.cmm"
+        )
+        
+        ; Export Byte Pools to File
+        MENUITEM "[:plist]Export Byte Pools to File"
+        (
+          do "&_global_PLY_script_dir\_tx_export_byte_pools.cmm"
+        )
+        
+        ; Export Block Pools to File
+        MENUITEM "[:plist]Export Block Pools to File"
+        (
+          do "&_global_PLY_script_dir\_tx_export_block_pools.cmm"
+        )
+        AFTER "Export Block Pools to File"
+        SEPARATOR
+        ; Analyze Threads Stack Overflow
+        MENUITEM "[:plist]Analyze Threads Stack Overflow"
+        (
+          do "&_global_PLY_script_dir\_tx_analyze_threads_stack_overflow.cmm"
+        )
+      )
+    )
+  )
+)
+
+enddo

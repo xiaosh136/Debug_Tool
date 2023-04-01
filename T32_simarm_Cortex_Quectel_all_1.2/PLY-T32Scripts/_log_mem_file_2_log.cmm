@@ -1,0 +1,103 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  LOG Component                                                                                         ;;
+;;                                                                                                        ;;
+;;    LOG : Convert a memory file to file                                                            ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; Create logging output window
+area.create logging_win 200. 500.
+area.select logging_win
+area.view logging_win
+
+;PMACRO.list
+local &err
+&err=0
+
+; Enter the export directory if null
+global &_global_export_dir
+&curr_script_dir=os.ppd()
+do "&curr_script_dir\_setting_input_export_dir_if_null.cmm"
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+
+print "Select memory file: "
+DIALOG.FILE "&export_dir\*.mem"
+ENTRY %line &mem_file_path
+
+if ("&mem_file_path"=="")
+(
+  &err=1
+  goto CMM_END
+)
+
+; Makeup output file path
+local &output_file_path
+local &output_file_name
+local &core_name
+&output_file_name="log_dump_mem_file_2_log.txt"
+&output_file_path="&(export_dir)/&output_file_name"
+
+print "Export to directory : &(export_dir)"
+print "Start time : " clock.date() "  " clock.time() "  ..."
+print ""
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Start ...                                                                                             ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+&cmd_line="&curr_script_dir\mem2log.exe &mem_file_path --outdir &(export_dir) > &output_file_path"
+OS.Command "&cmd_line"
+wait 5.s
+
+;after loading memory & axf, we can get the sipc memory by TRACE32
+if (symbol.exist(s_log_sipc_param))
+(
+  &sipc_param_smem=v.value(s_log_sipc_param.smem)
+  ;&cmd_line="&curr_script_dir\mem2log.exe &mem_file_path --outdir &(export_dir) --scansipc &sipc_param_smem:0x00800000 > &output_file_path"
+  ;OS.Command "&cmd_line"
+  ;wait 5.s
+)
+
+CMM_END:
+area.select logging_win
+
+print ""
+print "End time : " clock.date() "  " clock.time() "  "
+
+; Close the logging output window
+; wait 1s
+if (&err==0)
+(
+  type &output_file_path
+  area.close logging_win
+  do "&curr_script_dir\_trace32_area_delete.cmm" "logging_win"
+)
+
+enddo

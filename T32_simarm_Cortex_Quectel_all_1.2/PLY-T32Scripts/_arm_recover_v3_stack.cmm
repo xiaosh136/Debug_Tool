@@ -1,0 +1,284 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  ARM Component                                                                                         ;;
+;;                                                                                                        ;;
+;;    Common: recover stack                                                                               ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Create logging output window
+area.create recover_stack_win 200. 500.
+area.select recover_stack_win
+area.view recover_stack_win
+
+;PMACRO.list
+local &err
+&err=0
+
+&curr_script_dir=os.ppd()
+
+local &current_exception_type
+local &current_r14
+local &current_cpsr
+local &current_spsr
+local &current_cpsr_mode
+local &current_spsr_mode
+local &svc_mode_reg_addr
+local &irq_mode_reg_addr
+local &core_nums
+local &core_index
+local &assert_info_offset
+
+local &core_name
+local &sys_id
+if !symbol.exist(LOG_magicHeader)
+(
+  &err=1
+  print "Error: `LOG_magicHeader' does not exist. EXIT script"
+  goto CMM_END
+)
+
+&magic_name=data.string(d:v.value(LOG_magicHeader.magicName))
+&core_name=data.string(d:v.value(LOG_magicHeader.coreName))
+if ("&core_name"==""&&"&magic_name"!="")
+(
+  if (string.scan("&magic_name","NR",0)!=-1)
+  (
+    &core_name="NR"
+    print "core_name: no name, seems NR-PHY from magic name"
+  )
+)
+
+print "core_name: &core_name"
+&core_total_nums=v.value(sizeof(modem_assert_info)/sizeof(modem_assert_info[0]))
+
+
+if ("&core_name"=="PS")
+(
+  &sys_id=0
+  &core_nums=2
+  &assert_info_offset=0 ; modem_assert_info[0], [1] 
+)
+else if (("&core_name"=="V3-PHY")||("&core_name"=="NR"))
+(
+  if (&core_total_nums==5)
+  (
+    if ("&core_name"=="V3-PHY")
+    (
+      &sys_id=1
+      &core_nums=1
+      &assert_info_offset=2 ; modem_assert_info[2]
+    )
+    else
+    (
+      &sys_id=2
+      &core_nums=2
+      &assert_info_offset=3 ; modem_assert_info[3], [4]
+    )
+  )
+  else
+  (
+    &sys_id=1
+    &core_nums=2
+    &assert_info_offset=2 ; modem_assert_info[2], [3]
+  )
+)
+else
+(
+  &err=1
+  print "Error: &core_name core is unknown. EXIT script"
+  goto CMM_END
+)
+
+&core_index=0
+
+while &core_index<&core_nums
+(
+  if (&core_nums>1)
+  (
+    core.select &core_index
+  )
+  
+  &assert_debug_info_addr=V.Value((ASSERT_DEBUG_T *)(&modem_assert_info[&core_index+&assert_info_offset].assert_debug_info[0]))
+  &current_exception_type=V.Value(modem_assert_info[&core_index+&assert_info_offset].assert_debug_info[0].assert_info.exception_type)
+  
+  R.S CPSR V.Value(((ASSERT_DEBUG_T *)&assert_debug_info_addr)->reg_info.core_reg.cur_mode_reg.CPSR)
+  R.S r0 V.Value(((ASSERT_DEBUG_T *)&assert_debug_info_addr)->reg_info.core_reg.cur_mode_reg.r0)
+  R.S r1 V.Value(((ASSERT_DEBUG_T *)&assert_debug_info_addr)->reg_info.core_reg.cur_mode_reg.r1)
+  R.S r2 V.Value(((ASSERT_DEBUG_T *)&assert_debug_info_addr)->reg_info.core_reg.cur_mode_reg.r2)
+  R.S r3 V.Value(((ASSERT_DEBUG_T *)&assert_debug_info_addr)->reg_info.core_reg.cur_mode_reg.r3)
+  R.S r4 V.Value(((ASSERT_DEBUG_T *)&assert_debug_info_addr)->reg_info.core_reg.cur_mode_reg.r4)
+  R.S r5 V.Value(((ASSERT_DEBUG_T *)&assert_debug_info_addr)->reg_info.core_reg.cur_mode_reg.r5)
+  R.S r6 V.Value(((ASSERT_DEBUG_T *)&assert_debug_info_addr)->reg_info.core_reg.cur_mode_reg.r6)
+  R.S r7 V.Value(((ASSERT_DEBUG_T *)&assert_debug_info_addr)->reg_info.core_reg.cur_mode_reg.r7)
+  R.S r8 V.Value(((ASSERT_DEBUG_T *)&assert_debug_info_addr)->reg_info.core_reg.cur_mode_reg.r8)
+  R.S r9 V.Value(((ASSERT_DEBUG_T *)&assert_debug_info_addr)->reg_info.core_reg.cur_mode_reg.r9)
+  R.S r10 V.Value(((ASSERT_DEBUG_T *)&assert_debug_info_addr)->reg_info.core_reg.cur_mode_reg.r10)
+  R.S r11 V.Value(((ASSERT_DEBUG_T *)&assert_debug_info_addr)->reg_info.core_reg.cur_mode_reg.r11)
+  R.S r12 V.Value(((ASSERT_DEBUG_T *)&assert_debug_info_addr)->reg_info.core_reg.cur_mode_reg.r12)
+  R.S r13 V.Value(((ASSERT_DEBUG_T *)&assert_debug_info_addr)->reg_info.core_reg.cur_mode_reg.r13)
+  R.S r14 V.Value(((ASSERT_DEBUG_T *)&assert_debug_info_addr)->reg_info.core_reg.cur_mode_reg.r14)
+  R.S pc V.Value(((ASSERT_DEBUG_T *)&assert_debug_info_addr)->reg_info.core_reg.cur_mode_reg.PC)
+  
+  &current_r14=V.Value(((ASSERT_DEBUG_T *)&assert_debug_info_addr)->reg_info.core_reg.cur_mode_reg.r14)
+  &current_cpsr=V.Value(((ASSERT_DEBUG_T *)&assert_debug_info_addr)->reg_info.core_reg.cur_mode_reg.CPSR)
+  &current_spsr=V.Value(((ASSERT_DEBUG_T *)&assert_debug_info_addr)->reg_info.core_reg.cur_mode_reg.SPSR)
+  &current_cpsr_mode=(&current_cpsr&0x1f)
+  &current_spsr_mode=(&current_spsr&0x1f)
+  &svc_mode_reg_addr=V.Value((OTHER_REG_T *)&(((ASSERT_DEBUG_T *)&assert_debug_info_addr)->reg_info.core_reg.svc_mode_reg))
+  
+  &abort_DFSR_reg=V.Value(((ASSERT_DEBUG_T *)&assert_debug_info_addr)->reg_info.mpu_reg.abort_DFSR_reg)
+  &abort_FAR_reg=V.Value(((ASSERT_DEBUG_T *)&assert_debug_info_addr)->reg_info.mpu_reg.abort_FAR_reg)
+  
+  global &_global_psr_i &_global_psr_f &_global_psr_t &_global_psr_mode &_global_psr_mode_name
+  do "&curr_script_dir\_arm_analyze_xpsr.cmm" "&current_cpsr"
+  print "the current mode is &current_cpsr: &_global_psr_mode_name mode {i:&_global_psr_i,f:&_global_psr_f,t:&_global_psr_t}."
+  do "&curr_script_dir\_arm_analyze_xpsr.cmm" "&current_spsr"
+  print "the previous mode is &current_spsr: &_global_psr_mode_name mode {i:&_global_psr_i,f:&_global_psr_f,t:&_global_psr_t}."
+  
+  print "Core &core_index exception type is &current_exception_type"
+  
+  if &current_cpsr_mode==0x13
+  (
+    print "the current mode is svc mode."
+  )
+  else if &current_cpsr_mode==0x12
+  (
+    print "the current mode is irq mode."
+    R.S R13_SVC  V.Value(((OTHER_REG_T *)&svc_mode_reg_addr)->r13)
+    R.S R14_SVC  V.Value(((OTHER_REG_T *)&svc_mode_reg_addr)->r14)
+    R.S SPSR_SVC  V.Value(((OTHER_REG_T *)&svc_mode_reg_addr)->SPSR)
+  )
+  else if (&current_cpsr_mode==0x17)
+  (
+    if (&current_exception_type==0x4)      ;data abort
+    (
+      print "the current mode is data abort mode."
+      if (v.value(&(abort_DFSR_reg)&0xF)==v.value("0x1"))&&(v.value(&(abort_DFSR_reg)&0x400)==v.value("0x0"))
+      (
+        ; 0xxxxxx0001b
+        print "DFSR:0x" &(abort_DFSR_reg) ": Alignment fault!"
+      )
+      else if (v.value(&(abort_DFSR_reg)&0xF)==v.value("0x0"))&&(v.value(&(abort_DFSR_reg)&0x400)==v.value("0x0"))
+      (
+        ; 0xxxxxx0001b
+        print "DFSR:0x" &(abort_DFSR_reg) ": Background fault!"
+      )
+      else if (v.value(&(abort_DFSR_reg)&0xF)==v.value("0xD"))&&(v.value(&(abort_DFSR_reg)&0x400)==v.value("0x0"))
+      (
+        ; 0xxxxxx1101b
+        print "DFSR:0x" &(abort_DFSR_reg) ": Permission fault!"
+      )
+      else if (v.value(&(abort_DFSR_reg)&0xF)==v.value("0x6"))&&(v.value(&(abort_DFSR_reg)&0x400)==v.value("0x400"))
+      (
+        ; 1xxxxxx0110b
+        print "DFSR:0x" &(abort_DFSR_reg) ": Asynchronous external abort!"
+      )
+      
+      if &current_spsr_mode==0x13
+      (
+        &reg_lr=V.Value(((OTHER_REG_T *)&svc_mode_reg_addr)->r14)
+        &reg_pc=&current_r14-4
+        print "back to svc mode (lr: &reg_lr <- pc: &reg_pc)" 
+        R.S CPSR &current_spsr
+        R.S PC (&current_r14-8)
+        R.S r13 V.Value(((OTHER_REG_T *)&svc_mode_reg_addr)->r13)
+        R.S r14 V.Value(((OTHER_REG_T *)&svc_mode_reg_addr)->r14)
+      )
+      else if &current_spsr_mode==0x12
+      (
+        print "back to irq mode!"
+        &irq_mode_reg_addr=V.Value((OTHER_REG_T *)&(((ASSERT_DEBUG_T *)&assert_debug_info_addr)->reg_info.core_reg.irq_mode_reg))
+        R.S CPSR &current_spsr
+        R.S PC (&current_r14-8)
+        R.S r13 V.Value(((OTHER_REG_T *)&irq_mode_reg_addr)->r13)
+        R.S r14 V.Value(((OTHER_REG_T *)&irq_mode_reg_addr)->r14)
+      )
+    )
+    else if (&current_exception_type==0x3) ;prefetch abort
+    (
+      print "the current mode is prefetch abort mode."
+      if &current_spsr_mode==0x13
+      (
+        &reg_lr=V.Value(((OTHER_REG_T *)&svc_mode_reg_addr)->r14)
+        &reg_pc=&current_r14-4
+        print "back to svc mode (lr: &reg_lr <- pc: &reg_pc)" 
+        R.S CPSR &current_spsr
+        R.S PC (&current_r14-4)
+        R.S r13 V.Value(((OTHER_REG_T *)&svc_mode_reg_addr)->r13)
+        R.S r14 V.Value(((OTHER_REG_T *)&svc_mode_reg_addr)->r14)
+      )
+      else if &current_spsr_mode==0x12
+      (
+        &irq_mode_reg_addr=V.Value((OTHER_REG_T *)&(((ASSERT_DEBUG_T *)&assert_debug_info_addr)->reg_info.core_reg.irq_mode_reg))
+        R.S CPSR &current_spsr
+        R.S PC (&current_r14-8)
+        R.S r13 V.Value(((OTHER_REG_T *)&irq_mode_reg_addr)->r13)
+        R.S r14 V.Value(((OTHER_REG_T *)&irq_mode_reg_addr)->r14)
+      )
+    )
+  )
+  else if &current_cpsr_mode==0x1b
+  (
+    ;undef instr
+    print "the current mode is undef instr mode."
+    if &current_spsr_mode==0x13
+    (
+      R.S CPSR &current_spsr
+      R.S PC &current_r14
+      R.S r13 V.Value(((OTHER_REG_T *)&svc_mode_reg_addr)->r13)
+      R.S r14 V.Value(((OTHER_REG_T *)&svc_mode_reg_addr)->r14)
+    )
+    else if &current_spsr_mode==0x12
+    (
+      &irq_mode_reg_addr=V.Value((OTHER_REG_T *)&(((ASSERT_DEBUG_T *)&assert_debug_info_addr)->reg_info.core_reg.irq_mode_reg))
+      R.S CPSR &current_spsr
+      R.S PC (&current_r14-8)
+      R.S r13 V.Value(((OTHER_REG_T *)&irq_mode_reg_addr)->r13)
+      R.S r14 V.Value(((OTHER_REG_T *)&irq_mode_reg_addr)->r14)
+    )
+  )
+  
+  &core_index=&core_index+1
+)
+
+if (&core_nums>1)
+(
+  ;back to core0
+  core.select 0
+)
+
+print "recover completely..."
+
+CMM_END:
+
+; Close the logging output window
+;wait 5s
+;if (&err==0)
+;(
+;  area.close recover_stack_win
+;  do "&curr_script_dir\_trace32_area_delete.cmm" "recover_stack_win"
+;)
+
+enddo

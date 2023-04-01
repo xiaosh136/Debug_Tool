@@ -1,0 +1,276 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  TX Component                                                                                          ;;
+;;                                                                                                        ;;
+;;    Timer: Save the timers info into the HOST file.                                                     ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; Create logging output window
+area.create logging_win 200. 500.
+area.select logging_win
+area.view logging_win
+
+;PMACRO.list
+local &err
+&err=0
+
+; Enter the export directory if null
+global &_global_export_dir
+&curr_script_dir=os.ppd()
+do "&curr_script_dir\_setting_input_export_dir_if_null.cmm"
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+
+; Makeup output file path
+local &output_file_path
+local &output_file_name
+local &core_name
+if symbol.exist(LOG_magicHeader)
+(
+  &core_name=data.string(d:v.value(LOG_magicHeader.coreName))
+  &output_file_name="tx_timerinfo_&(core_name).txt"
+)
+else
+(
+  &output_file_name="tx_timerinfo.txt"
+)
+&output_file_path="&(export_dir)/&output_file_name"
+
+print "Export to directory : &(export_dir)"
+print "Start time : " clock.date() "  " clock.time() "  ..."
+print ""
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Start ...                                                                                             ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &head_symbol
+&head_symbol="_tx_timer_list_head"
+if !(symbol.exist(&head_symbol))
+(
+  &err=1
+  print "Error: `_tx_timer_list_head' does not exist. EXIT script"
+  goto CMM_END
+)
+
+; Create output file
+area.create output_file_win 200. 500.
+area.open output_file_win "&output_file_path"
+area.select output_file_win
+
+; const values
+; 'THRD' or 'ATIM'
+&TX_THREAD_ID=0x54485244        ; 'THRD'
+&TX_TIMER_ID=0x4154494D         ; 'ATIM'
+
+local &tx_timer_internal_remaining_ticks
+local &tx_timer_internal_re_initialize_ticks
+local &tx_timer_internal_timeout_function
+local &tx_timer_internal_timeout_param
+local &tx_timer_internal_active_next
+local &tx_timer_internal_active_previous
+local &tx_timer_ptr
+local &tx_timer_name
+local &tx_timer_id
+local &tx_thread_ptr
+local &tx_thread_name
+local &tx_thread_id
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Active Timer Info                                                                                     ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &active_cnt
+&active_cnt=0
+local &head_symbol_val &temp_timer_ptr
+&head_symbol="_tx_timer_list_head"
+&head_symbol_val=address.offset(&head_symbol)
+&first_timer_ptr=v.value(&head_symbol)
+&temp_timer_ptr=v.value(&head_symbol)
+&thread_timer_offset=v.value(&((TX_THREAD *)0)->tx_thread_timer)
+&timer_internal_offset=v.value(&((TX_TIMER *)0)->tx_timer_internal)
+if (&temp_timer_ptr==0)
+  goto CMM_LOOP_1_END
+  
+print ""
+print "===============Active Timer Info==============="
+print "  Type       Addr   Remain       Func    Param     Next     Prev Name"
+
+CMM_LOOP_1:
+
+if (v.value("sizeof(TX_TIMER)")==v.value("48"))
+(
+  &tx_timer_internal_remaining_ticks=format.decimal(8,v.value(((TX_INTERNAL_TIMER*)&temp_timer_ptr)->tx_remaining_ticks))
+  &tx_timer_internal_re_initialize_ticks=format.decimal(8,v.value(((TX_INTERNAL_TIMER*)&temp_timer_ptr)->tx_re_initialize_ticks))
+  &tx_timer_internal_timeout_function=v.value(((TX_INTERNAL_TIMER*)&temp_timer_ptr)->tx_timeout_function)
+  &tx_timer_internal_timeout_param=format.hex(8,v.value(((TX_INTERNAL_TIMER*)&temp_timer_ptr)->tx_timeout_param))
+  &tx_timer_internal_active_next=format.hex(8,v.value(((TX_INTERNAL_TIMER*)&temp_timer_ptr)->tx_active_next))
+  &tx_timer_internal_active_previous=format.hex(8,v.value(((TX_INTERNAL_TIMER*)&temp_timer_ptr)->tx_active_previous))
+  &tx_timer_ptr=&temp_timer_ptr-&timer_internal_offset
+  &tx_timer_name=data.string(d:v.value(((TX_TIMER *)&tx_timer_ptr)->tx_timer_name))
+  &tx_timer_id=v.value(((TX_TIMER *)&tx_timer_ptr)->tx_timer_id)
+  &tx_thread_ptr=&temp_timer_ptr-&thread_timer_offset
+  &tx_thread_name=data.string(d:v.value(((TX_THREAD *)&tx_thread_ptr)->tx_thread_name))
+  &tx_thread_id=v.value(((TX_THREAD *)&tx_thread_ptr)->tx_thread_id)
+)
+else if (v.value("sizeof(TX_TIMER)")==v.value("52"))
+(
+  &tx_timer_internal_remaining_ticks=format.decimal(8,v.value(((TX_TIMER_INTERNAL*)&temp_timer_ptr)->tx_timer_internal_remaining_ticks))
+  &tx_timer_internal_re_initialize_ticks=format.decimal(8,v.value(((TX_TIMER_INTERNAL*)&temp_timer_ptr)->tx_timer_internal_re_initialize_ticks))
+  &tx_timer_internal_timeout_function=v.value(((TX_TIMER_INTERNAL*)&temp_timer_ptr)->tx_timer_internal_timeout_function)
+  &tx_timer_internal_timeout_param=format.hex(8,v.value(((TX_TIMER_INTERNAL*)&temp_timer_ptr)->tx_timer_internal_timeout_param))
+  &tx_timer_internal_active_next=format.hex(8,v.value(((TX_TIMER_INTERNAL*)&temp_timer_ptr)->tx_timer_internal_active_next))
+  &tx_timer_internal_active_previous=format.hex(8,v.value(((TX_TIMER_INTERNAL*)&temp_timer_ptr)->tx_timer_internal_active_previous))
+  &tx_timer_ptr=&temp_timer_ptr-&timer_internal_offset
+  &tx_timer_name=data.string(d:v.value(((TX_TIMER *)&tx_timer_ptr)->tx_timer_name))
+  &tx_timer_id=v.value(((TX_TIMER *)&tx_timer_ptr)->tx_timer_id)
+  &tx_thread_ptr=&temp_timer_ptr-&thread_timer_offset
+  &tx_thread_name=data.string(d:v.value(((TX_THREAD *)&tx_thread_ptr)->tx_thread_name))
+  &tx_thread_id=v.value(((TX_THREAD *)&tx_thread_ptr)->tx_thread_id)
+)
+
+if (&tx_timer_id==&TX_TIMER_ID)
+(
+  print  "[ATIM] &tx_timer_ptr &(tx_timer_internal_remaining_ticks) &(tx_timer_internal_timeout_function) &(tx_timer_internal_timeout_param) &(tx_timer_internal_active_next) &tx_timer_internal_active_previous &tx_timer_name"
+)
+else if (&tx_thread_id==&TX_THREAD_ID) 
+(
+  print  "[THRD] &tx_thread_ptr &(tx_timer_internal_remaining_ticks) &(tx_timer_internal_timeout_function) &(tx_timer_internal_timeout_param) &(tx_timer_internal_active_next) &tx_timer_internal_active_previous &tx_thread_name"
+)
+else
+(
+  print  "[UNKN] &tx_timer_ptr &(tx_timer_internal_remaining_ticks) &(tx_timer_internal_timeout_function) &(tx_timer_internal_timeout_param) &(tx_timer_internal_active_next) &tx_timer_internal_active_previous &tx_timer_name"
+)
+
+local &next_temp_timer_ptr
+;&next_temp_timer_ptr=v.value(((TX_TIMER_INTERNAL*)&temp_timer_ptr)->tx_timer_internal_active_next)
+&temp_timer_ptr=&tx_timer_internal_active_next
+&active_cnt=&active_cnt+1
+
+if (&temp_timer_ptr!=&first_timer_ptr)&&(&temp_timer_ptr!=0)
+  goto CMM_LOOP_1
+
+CMM_LOOP_1_END:
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Created Timer Info                                                                                    ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+local &created_cnt
+&created_cnt=0
+&head_symbol="_tx_timer_created_ptr"
+&head_symbol_val=address.offset(&head_symbol)
+&first_timer_ptr=v.value(&head_symbol)
+&temp_timer_ptr=v.value(&head_symbol)
+
+print ""
+print "===============Created Timer Info==============="
+print "  Type       Addr   Remain       Func    Param     Next     Prev Name"
+
+CMM_LOOP_2:
+
+if (v.value("sizeof(TX_TIMER)")==v.value("48"))
+(
+  &tx_timer_internal_remaining_ticks=format.decimal(8,v.value(((TX_TIMER *)&temp_timer_ptr)->tx_timer_internal.tx_remaining_ticks))
+  &tx_timer_internal_re_initialize_ticks=format.decimal(8,v.value(((TX_TIMER*)&temp_timer_ptr)->tx_timer_internal.tx_re_initialize_ticks))
+  &tx_timer_internal_timeout_function=v.value(((TX_TIMER*)&temp_timer_ptr)->tx_timer_internal.tx_timeout_function)
+  &tx_timer_internal_timeout_param=format.hex(8,v.value(((TX_TIMER*)&temp_timer_ptr)->tx_timer_internal.tx_timeout_param))
+  &tx_timer_internal_active_next=format.hex(8,v.value(((TX_TIMER*)&temp_timer_ptr)->tx_timer_internal.tx_active_next))
+  &tx_timer_internal_active_previous=format.hex(8,v.value(((TX_TIMER*)&temp_timer_ptr)->tx_timer_internal.tx_active_previous))
+  &tx_timer_name=data.string(d:v.value(((TX_TIMER *)&temp_timer_ptr)->tx_timer_name))
+  &tx_timer_id=v.value(((TX_TIMER *)&temp_timer_ptr)->tx_timer_id)
+)
+else if (v.value("sizeof(TX_TIMER)")==v.value("52"))
+(
+  &tx_timer_internal_remaining_ticks=format.decimal(8,v.value(((TX_TIMER *)&temp_timer_ptr)->tx_timer_internal.tx_timer_internal_remaining_ticks))
+  &tx_timer_internal_re_initialize_ticks=format.decimal(8,v.value(((TX_TIMER*)&temp_timer_ptr)->tx_timer_internal.tx_timer_internal_re_initialize_ticks))
+  &tx_timer_internal_timeout_function=v.value(((TX_TIMER*)&temp_timer_ptr)->tx_timer_internal.tx_timer_internal_timeout_function)
+  &tx_timer_internal_timeout_param=format.hex(8,v.value(((TX_TIMER*)&temp_timer_ptr)->tx_timer_internal.tx_timer_internal_timeout_param))
+  &tx_timer_internal_active_next=format.hex(8,v.value(((TX_TIMER*)&temp_timer_ptr)->tx_timer_internal.tx_timer_internal_active_next))
+  &tx_timer_internal_active_previous=format.hex(8,v.value(((TX_TIMER*)&temp_timer_ptr)->tx_timer_internal.tx_timer_internal_active_previous))
+  &tx_timer_name=data.string(d:v.value(((TX_TIMER *)&temp_timer_ptr)->tx_timer_name))
+  &tx_timer_id=v.value(((TX_TIMER *)&temp_timer_ptr)->tx_timer_id)
+)
+
+if (&tx_timer_id==&TX_TIMER_ID)
+(
+  print  "[ATIM] &temp_timer_ptr &(tx_timer_internal_remaining_ticks) &(tx_timer_internal_timeout_function) &(tx_timer_internal_timeout_param) &(tx_timer_internal_active_next) &tx_timer_internal_active_previous &tx_timer_name"
+)
+else
+(
+  print  "[UNKN] &temp_timer_ptr &(tx_timer_internal_remaining_ticks) &(tx_timer_internal_timeout_function) &(tx_timer_internal_timeout_param) &(tx_timer_internal_active_next) &tx_timer_internal_active_previous &tx_timer_name"
+)
+
+&next_temp_timer_ptr=v.value(((TX_TIMER*)&temp_timer_ptr)->tx_timer_created_next)
+&temp_timer_ptr=&next_temp_timer_ptr
+&created_cnt=&created_cnt+1
+
+if (&temp_timer_ptr!=&first_timer_ptr)&&(&temp_timer_ptr!=0)
+  goto CMM_LOOP_2
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Counter Info                                                                                          ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+print ""
+print "===============Counter Info==============="
+&active_cnt=format.decimal(8,&active_cnt)
+&created_cnt=format.decimal(8,&created_cnt)
+print " Active counter: &active_cnt"
+print " Created counter: &created_cnt"
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  End                                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_FILE_CLOSE:
+print ""
+area.close output_file_win
+area.clear output_file_win
+
+type "&output_file_path"
+
+CMM_END:
+area.select logging_win
+
+print ""
+print "End time : " clock.date() "  " clock.time() "  "
+
+; Close the logging output window
+; wait 1s
+if (&err==0)
+(
+  area.close logging_win
+  do "&curr_script_dir\_trace32_area_delete.cmm" "logging_win"
+)
+
+enddo

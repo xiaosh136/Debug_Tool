@@ -1,0 +1,235 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Assert Component                                                                                      ;;
+;;                                                                                                        ;;
+;;    Assert: get assert info                                                                             ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+global &_global_abort_info &_global_abort_core_index &_global_abort_DFSR_reg &_global_abort_FAR_reg
+&_global_abort_info=""
+&_global_abort_core_index=0
+&_global_abort_DFSR_reg=0
+&_global_abort_FAR_reg=0
+
+; V3 ? V4 ?
+if (symbol.exist(modem_assert_info)&&(symbol.exist(LOG_magicHeader)))
+(
+  &modem_assert_info_cnt=v.value(sizeof(modem_assert_info)/sizeof(modem_assert_info[0]))
+  &RUNNING_E=v.value("0")
+  &ACTIVE_ASSERT_E=v.value("1")
+  &ASSERT_BY_MBOX_E=v.value("2")
+  &ASSERT_BY_OTHER_CORE_E=v.value("3")
+  &DSP_HUNGING_E=v.value("4")
+  
+  &abort_DFSR_reg=0
+  &abort_FAR_reg=0
+  &current_cpsr=0
+  &current_exception_type=0
+  
+  local &core_nums
+  local &core_index
+  local &assert_info_offset
+  
+  &core_index=0
+  &core_name=data.string(d:v.value(LOG_magicHeader.coreName))
+  ;print "core_name: &core_name"
+  
+  if ("&core_name"=="PS")
+  (
+    if (v.value(modem_assert_info[1].assert_debug_info[0].assert_info.status)==&ACTIVE_ASSERT_E)
+    (
+      &core_index=1
+      &abort_DFSR_reg=v.value(modem_assert_info[1].assert_debug_info[0].reg_info.mpu_reg.abort_DFSR_reg)
+      &abort_FAR_reg=v.value(modem_assert_info[1].assert_debug_info[0].reg_info.mpu_reg.abort_FAR_reg)
+      &current_cpsr=V.Value(modem_assert_info[1].assert_debug_info[0].reg_info.core_reg.cur_mode_reg.CPSR)
+      &current_exception_type=V.Value(modem_assert_info[1].assert_debug_info[0].assert_info.exception_type)
+    )
+    else
+    (
+      &core_index=0
+      &abort_DFSR_reg=v.value(modem_assert_info[0].assert_debug_info[0].reg_info.mpu_reg.abort_DFSR_reg)
+      &abort_FAR_reg=v.value(modem_assert_info[0].assert_debug_info[0].reg_info.mpu_reg.abort_FAR_reg)
+      &current_cpsr=V.Value(modem_assert_info[0].assert_debug_info[0].reg_info.core_reg.cur_mode_reg.CPSR)
+      &current_exception_type=V.Value(modem_assert_info[0].assert_debug_info[0].assert_info.exception_type)
+    )
+  )
+  else if ((("&core_name"=="PHY")||("&core_name"=="V3-PHY"))&&(&modem_assert_info_cnt==4))
+  (
+    if (v.value(modem_assert_info[3].assert_debug_info[0].assert_info.status)==&ACTIVE_ASSERT_E)
+    (
+      &core_index=1
+      &abort_DFSR_reg=v.value(modem_assert_info[3].assert_debug_info[0].reg_info.mpu_reg.abort_DFSR_reg)
+      &abort_FAR_reg=v.value(modem_assert_info[3].assert_debug_info[0].reg_info.mpu_reg.abort_FAR_reg)
+      &current_cpsr=V.Value(modem_assert_info[3].assert_debug_info[0].reg_info.core_reg.cur_mode_reg.CPSR)
+      &current_exception_type=V.Value(modem_assert_info[3].assert_debug_info[0].assert_info.exception_type)
+    )
+    else
+    (
+      &core_index=0
+      &abort_DFSR_reg=v.value(modem_assert_info[2].assert_debug_info[0].reg_info.mpu_reg.abort_DFSR_reg)
+      &abort_FAR_reg=v.value(modem_assert_info[2].assert_debug_info[0].reg_info.mpu_reg.abort_FAR_reg)
+      &current_cpsr=V.Value(modem_assert_info[2].assert_debug_info[0].reg_info.core_reg.cur_mode_reg.CPSR)
+      &current_exception_type=V.Value(modem_assert_info[2].assert_debug_info[0].assert_info.exception_type)
+    )
+  )
+  else if ("&core_name"=="V3-PHY")
+  (
+    &core_index=0
+    &abort_DFSR_reg=v.value(modem_assert_info[2].assert_debug_info[0].reg_info.mpu_reg.abort_DFSR_reg)
+    &abort_FAR_reg=v.value(modem_assert_info[2].assert_debug_info[0].reg_info.mpu_reg.abort_FAR_reg)
+    &current_cpsr=V.Value(modem_assert_info[2].assert_debug_info[0].reg_info.core_reg.cur_mode_reg.CPSR)
+    &current_exception_type=V.Value(modem_assert_info[2].assert_debug_info[0].assert_info.exception_type)
+  )
+  else if ("&core_name"=="NR")
+  (
+    if (v.value(modem_assert_info[4].assert_debug_info[0].assert_info.status)==&ACTIVE_ASSERT_E)
+    (
+      &core_index=1
+      &abort_DFSR_reg=v.value(modem_assert_info[4].assert_debug_info[0].reg_info.mpu_reg.abort_DFSR_reg)
+      &abort_FAR_reg=v.value(modem_assert_info[4].assert_debug_info[0].reg_info.mpu_reg.abort_FAR_reg)
+      &current_cpsr=V.Value(modem_assert_info[4].assert_debug_info[0].reg_info.core_reg.cur_mode_reg.CPSR)
+      &current_exception_type=V.Value(modem_assert_info[4].assert_debug_info[0].assert_info.exception_type)
+    )
+    else
+    (
+      &core_index=0
+      &abort_DFSR_reg=v.value(modem_assert_info[3].assert_debug_info[0].reg_info.mpu_reg.abort_DFSR_reg)
+      &abort_FAR_reg=v.value(modem_assert_info[3].assert_debug_info[0].reg_info.mpu_reg.abort_FAR_reg)
+      &current_cpsr=V.Value(modem_assert_info[3].assert_debug_info[0].reg_info.core_reg.cur_mode_reg.CPSR)
+      &current_exception_type=V.Value(modem_assert_info[3].assert_debug_info[0].assert_info.exception_type)
+    )
+  )
+  else
+  (
+  )
+  
+  &_global_abort_DFSR_reg=&abort_DFSR_reg
+  &_global_abort_FAR_reg=&abort_FAR_reg
+  &current_cpsr_mode=(&current_cpsr&0x1f)
+  ;print "current_cpsr_mode=&current_cpsr_mode"
+  ;print "current_exception_type=&current_exception_type"
+  ;print "abort_DFSR_reg=&abort_DFSR_reg"
+  if (&current_cpsr_mode==0x17) ; 0b10111 , abort
+  (
+    &_global_abort_core_index=&core_index
+    if (&current_exception_type==0x4)      ;data abort
+    (
+      ;print "the current mode is data abort mode."
+      if (v.value(&(abort_DFSR_reg)&0xF)==v.value("0x1"))&&(v.value(&(abort_DFSR_reg)&0x400)==v.value("0x0"))
+      (
+        ; 0xxxxxx0001b
+        &_global_abort_info="DFSR:&(abort_DFSR_reg) : Alignment fault at &(abort_FAR_reg) !"
+      )
+      else if (v.value(&(abort_DFSR_reg)&0xF)==v.value("0x0"))&&(v.value(&(abort_DFSR_reg)&0x400)==v.value("0x0"))
+      (
+        ; 0xxxxxx0001b
+        &_global_abort_info="DFSR:&(abort_DFSR_reg) : Background fault at &(abort_FAR_reg) !"
+      )
+      else if (v.value(&(abort_DFSR_reg)&0xF)==v.value("0xD"))&&(v.value(&(abort_DFSR_reg)&0x400)==v.value("0x0"))
+      (
+        ; 0xxxxxx1101b
+        &_global_abort_info="DFSR:&(abort_DFSR_reg) : Permission fault at &(abort_FAR_reg) !"
+      )
+      else if (v.value(&(abort_DFSR_reg)&0xF)==v.value("0x8"))&&(v.value(&(abort_DFSR_reg)&0x400)==v.value("0x0"))
+      (
+        ; 0xxxxxx1000b
+        &_global_abort_info="DFSR:&(abort_DFSR_reg) : Synchronous external abort at &(abort_FAR_reg) !"
+      )
+      else if (v.value(&(abort_DFSR_reg)&0xF)==v.value("0x6"))&&(v.value(&(abort_DFSR_reg)&0x400)==v.value("0x400"))
+      (
+        ; 1xxxxxx0110b
+        &_global_abort_info="DFSR:&(abort_DFSR_reg) : Asynchronous external abort!"
+      )
+      else if (v.value(&(abort_DFSR_reg)&0xF)==v.value("0x8"))&&(v.value(&(abort_DFSR_reg)&0x400)==v.value("0x400"))
+      (
+        ; 1xxxxxx1000b
+        &_global_abort_info="DFSR:&(abort_DFSR_reg) : Memory access asynchronous parity error!"
+      )
+      else
+      (
+        &_global_abort_info="DFSR:&(abort_DFSR_reg) : ? DFAR: &(abort_FAR_reg)"
+      )
+    )
+    else if (&current_exception_type==0x3) ;prefetch abort
+    (
+    )
+  )
+)
+else
+(
+  &core_index=0
+  &current_exception_type=0
+  
+  if (symbol.exist(abort_DFSR_reg)&&v.value("sizeof(abort_DFSR_reg)")!=v.value("0")&&symbol.exist(s_exception_type))
+  (
+    &cur_mode_reg_address=v.value(&cur_mode_reg)
+    &curr_r14=V.Value(*((uint32*)(&cur_mode_reg_address+56)))
+    &curr_cpsr=V.Value(*((uint32*)(&cur_mode_reg_address+68)))
+    &curr_spsr=V.Value(*((uint32*)(&cur_mode_reg_address+64)))
+    &current_cpsr_mode=(&curr_cpsr&0x1f)
+    &current_spsr_mode=(&curr_spsr&0x1f)
+
+    &abort_DFSR_reg=V.Value(abort_DFSR_reg)
+    &abort_FAR_reg=V.Value(abort_FAR_reg)
+    &_global_abort_DFSR_reg=&abort_DFSR_reg
+    &_global_abort_FAR_reg=&abort_FAR_reg
+    &current_exception_type=v.value(s_exception_type)
+    if (&current_cpsr_mode==0x17)
+    (
+      &_global_abort_core_index=&core_index
+      if (&current_exception_type==0x4)      ;data abort
+      (
+        ;print "the current mode is data abort mode."
+        if (v.value(&(abort_DFSR_reg)&0xF)==v.value("0x1"))&&(v.value(&(abort_DFSR_reg)&0x400)==v.value("0x0"))
+        (
+          ; 0xxxxxx0001b
+          &_global_abort_info="DFSR:0x&(abort_DFSR_reg) : Alignment fault!"
+        )
+        else if (v.value(&(abort_DFSR_reg)&0xF)==v.value("0x0"))&&(v.value(&(abort_DFSR_reg)&0x400)==v.value("0x0"))
+        (
+          ; 0xxxxxx0001b
+          &_global_abort_info="DFSR:0x&(abort_DFSR_reg) : Background fault!"
+        )
+        else if (v.value(&(abort_DFSR_reg)&0xF)==v.value("0xD"))&&(v.value(&(abort_DFSR_reg)&0x400)==v.value("0x0"))
+        (
+          ; 0xxxxxx1101b
+          &_global_abort_info="DFSR:0x&(abort_DFSR_reg) : Permission fault!"
+        )
+        else if (v.value(&(abort_DFSR_reg)&0xF)==v.value("0x6"))&&(v.value(&(abort_DFSR_reg)&0x400)==v.value("0x400"))
+        (
+          ; 1xxxxxx0110b
+          &_global_abort_info="DFSR:0x&(abort_DFSR_reg) : Asynchronous external abort!"
+        )
+      )
+      else if (&current_exception_type==0x3) ;prefetch abort
+      (
+      )
+    )
+  )
+)
+
+
+enddo

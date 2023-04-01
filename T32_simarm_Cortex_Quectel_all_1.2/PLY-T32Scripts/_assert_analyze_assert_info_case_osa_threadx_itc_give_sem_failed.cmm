@@ -1,0 +1,182 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Assert Component                                                                                      ;;
+;;                                                                                                        ;;
+;;    Assert: Analyze assert info                                                                             ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &caller_assert_win &assert_core_name &assert_core_num &caller_assert_info &assert_root_core_name &assert_root_core_index
+entry &caller_assert_win &assert_core_name &assert_core_num &caller_assert_info &assert_root_core_name &assert_root_core_index
+
+; remove \"\"
+&caller_assert_win=&caller_assert_win
+&caller_assert_info=&caller_assert_info
+&assert_core_name=&assert_core_name
+&assert_core_num=&assert_core_num
+&assert_root_core_name=&assert_root_core_name
+&assert_root_core_index=&assert_root_core_index
+
+&curr_script_dir=os.ppd()
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+
+; analyze assert info , case : "osa_threadx_itc.c" & "exp=Give sem Failed"
+if (string.scan("&caller_assert_info","osa_threadx_itc.c",0)!=-1)&&(string.scan("&caller_assert_info","exp=Give sem Failed",0)!=-1)
+(
+  area.select &caller_assert_win
+  print "Assert Info: &caller_assert_info"
+  
+  ; v.f to file
+  do "&curr_script_dir\_trace32_var_frame.cmm" "&export_dir\v.f.txt" "&assert_root_core_index" "&assert_core_num"
+  
+  ; analyze v.f file
+  &os_error_code=0
+  &has_ISR_Handler=0
+  &caller_osa_give_sem=""
+  local &myline
+  open #1 "&export_dir\v.f.txt" /read
+  read #1 %line &myline
+  while !file.eof(1)
+  (
+    print "  &myline"
+    if (string.scan("&myline","TXAS_SystemAssert(",0)!=-1)
+    (
+      read #1 %line &myline
+      if (!file.eof(1))
+      (
+        print "  &myline"
+        if (string.scan("&myline","osa_fatal_error_handler_info(",0)!=-1)
+        (
+          ; TX_WAIT_ERROR
+          &pos=string.scan("&myline","os_error_code = 12",0)
+          if (&pos!=-1)
+          (
+            &os_error_code=12
+          )
+        )
+      )
+    )
+    else if (string.scan("&myline","osa_give_sem(",0)!=-1)
+    (
+      read #1 %line &myline
+      if (!file.eof(1))
+      (
+        print "  &myline"
+        if (string.scan("&myline","(",0)!=-1&&string.scan("&myline","|",0)!=-1)
+        (
+          &start_pos=string.scan("&myline","|",0)
+          &start_pos=&start_pos+1
+          &end_pos=string.scan("&myline","(",0)
+          &caller_osa_give_sem=string.mid("&myline",&start_pos,&end_pos-&start_pos)
+        )
+      )
+    )
+    else if (string.scan("&myline","ISR_Handler(",0)!=-1)
+    (
+      &has_ISR_Handler=1
+    )
+    read #1 %line &myline
+  )
+  close #1
+  
+  ; get thread entry
+  global &_global_osa_tx_thread_entry &_global_osa_tx_thread_doing &_global_osa_tx_thread_frame_counter &_global_is_entry_from_return_address
+  do "&curr_script_dir\_osa_tx_get_thread_entry.cmm" "&export_dir\v.f.txt" "&assert_root_core_index" "&assert_core_num"
+  if (&_global_is_entry_from_return_address==1)
+  (
+    &prev_caller_addr=register(r14)
+    print "  Find the entry by R14: &prev_caller_addr"
+  )
+  if ("&_global_osa_tx_thread_doing"!="")
+  (
+    global &_global_symbol_attr &_global_symbol_prototype &_global_symbol_source
+    do "&curr_script_dir\_trace32_symbol_info.cmm" "&export_dir\y.info.txt" "&_global_osa_tx_thread_doing"
+    print "  [Task doing: &_global_osa_tx_thread_doing] in [owner: &_global_symbol_source]"
+  )
+  if ("&_global_osa_tx_thread_entry"!="")
+  (
+    print "  [Task entry: &_global_osa_tx_thread_entry]"
+  )
+  
+  ; get thread name
+  global &_global_tx_thread_current_name
+  &_global_tx_thread_current_name=""
+  do "&curr_script_dir\_tx_thread_current_name.cmm" "&assert_root_core_index" "&assert_core_num"
+  if ("&_global_tx_thread_current_name"!="")
+  (
+    print "  [Task name: &_global_tx_thread_current_name]"
+  )
+  
+  ; handle os_error_code: 12
+  if (&os_error_code==12)
+  (
+    print "  os_error_code = TX_SEMAPHORE_ERROR !"
+    
+    ; get _tx_thread_system_state
+    global &_global_tx_thread_system_state
+    global &_global_tx_thread_current_ptr
+    do "&curr_script_dir\_tx_thread_system_state.cmm" "&assert_root_core_index" "&assert_core_num"
+    do "&curr_script_dir\_tx_thread_current_ptr.cmm" "&assert_root_core_index" "&assert_core_num"
+    print "  The operating semaphore is illegal (such as: NULL, illegal or crashed semaphore) !"
+    
+    ; loop check all the semaphores
+    &ptr=v.value((TX_SEMAPHORE*)_tx_semaphore_created_ptr)
+    &head_symbol_val=v.value((TX_SEMAPHORE*)_tx_semaphore_created_ptr)
+    &created_cnt=0
+
+CMM_LOOP_SEMS:
+    &sem_id=v.value(((TX_SEMAPHORE*)&ptr)->tx_semaphore_id)
+    if &sem_id!=0x53454D41
+    (
+      ; The event list has been destroied 
+      print "Current semaphore list has been destroied (sem: &ptr)!!!"
+      goto CMM_END
+    )
+    
+    &ptr_tmp=v.value(((TX_SEMAPHORE*)&ptr)->tx_semaphore_created_next)
+    if &ptr_tmp==0
+    (
+      ; check if the semaphore list has been destroied 
+      print "Current semaphore list has been destroied (sem: &ptr)!!!"
+      goto CMM_END
+    )
+    &ptr=&ptr_tmp
+    &created_cnt=&created_cnt+1
+    
+    if &ptr!=&head_symbol_val
+      goto CMM_LOOP_SEMS
+    
+    &created_cnt_str=format.decimal(0,&created_cnt)
+    print "  Check &created_cnt_str semaphores, but no crashed semaphore was found !"
+    print "  The operating semaphore is illegal (such as: NULL or illegal) !"
+  )
+)
+
+CMM_END:
+
+enddo

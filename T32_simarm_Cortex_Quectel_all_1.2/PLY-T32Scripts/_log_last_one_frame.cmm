@@ -1,0 +1,144 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  LOG Component                                                                                         ;;
+;;                                                                                                        ;;
+;;    LOG : Save last one frame buffer to file                                                            ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; Create logging output window
+area.create logging_win 200. 500.
+area.select logging_win
+area.view logging_win
+
+;PMACRO.list
+local &err
+&err=0
+
+; Enter the export directory if null
+global &_global_export_dir
+&curr_script_dir=os.ppd()
+do "&curr_script_dir\_setting_input_export_dir_if_null.cmm"
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+
+; Makeup output file path
+local &output_file_path
+local &output_file_name
+local &core_name
+if symbol.exist(LOG_magicHeader)
+(
+  &core_name=data.string(d:v.value(LOG_magicHeader.coreName))
+  &output_file_name="log_last_one_frame_&(core_name).logel"
+)
+else
+(
+  &output_file_name="log_last_one_frame.logel"
+)
+&output_file_path="&(export_dir)/&output_file_name"
+
+print "Export to directory : &(export_dir)"
+print "Start time : " clock.date() "  " clock.time() "  ..."
+print ""
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Start ...                                                                                             ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+if !(symbol.exist(LOG_currDataIndex))
+(
+  &err=1
+  print "Error: `LOG_currDataIndex' does not exist. EXIT script"
+  goto CMM_END
+)
+
+local &dump_flag
+local &dump_error
+&dump_flag=0
+if (v.value(LOG_currDataIndex)==v.value("0"))
+(
+  &err=1
+  print "Error: `LOG_currDataIndex' = 0, mean no data. EXIT script"
+  goto CMM_END
+)
+
+&dump_flag=1
+
+var.set LOG_currFrameBuffer->lost_num=LOG_dropFrames
+var.set LOG_currFrameBuffer->frame_header.len=(0x20+LOG_currDataIndex*4)
+
+&src_addr=v.value(LOG_currFrameBuffer)
+
+Var.NEWLOCAL char[0x1000] \tmp_buffer
+&i=0
+&copy_len=(0x20+v.value(LOG_currDataIndex)*4)
+&len=4+&copy_len
+var.set \tmp_buffer[&i]=(&copy_len)&0xFF
+&i=&i+1
+var.set \tmp_buffer[&i]=(&copy_len>>8)&0xFF
+&i=&i+1
+var.set \tmp_buffer[&i]=(&copy_len>>16)&0xFF
+&i=&i+1
+var.set \tmp_buffer[&i]=(&copy_len>>24)&0xFF
+&i=&i+1
+while (&copy_len>0)
+(
+  &src_value=v.value(*(unsigned char *)&src_addr)
+  var.set \tmp_buffer[&i]=(&src_value)&0xFF
+  &i=&i+1
+  &copy_len=&copy_len-1
+  &src_addr=&src_addr+1
+)
+
+OPEN #3 &output_file_path /CREATE /BINARY
+&i=0
+while (&i<&len)
+(
+  WRITEB #3 Var.VALUE(\tmp_buffer[&i])
+  &i=&i+1
+)
+CLOSE #3
+
+type "&output_file_path"
+
+CMM_END:
+area.select logging_win
+
+print ""
+print "End time : " clock.date() "  " clock.time() "  "
+
+; Close the logging output window
+; wait 1s
+if (&err==0)
+(
+  area.close logging_win
+  do "&curr_script_dir\_trace32_area_delete.cmm" "logging_win"
+)
+
+enddo

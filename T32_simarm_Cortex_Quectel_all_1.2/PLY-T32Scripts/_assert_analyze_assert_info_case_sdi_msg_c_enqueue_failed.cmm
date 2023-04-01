@@ -1,0 +1,277 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Assert Component                                                                                      ;;
+;;                                                                                                        ;;
+;;    Assert: Analyze assert info                                                                             ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &caller_assert_win &assert_core_name &assert_core_num &caller_assert_info &assert_root_core_name &assert_root_core_index
+entry &caller_assert_win &assert_core_name &assert_core_num &caller_assert_info &assert_root_core_name &assert_root_core_index
+
+; remove \"\"
+&caller_assert_win=&caller_assert_win
+&caller_assert_info=&caller_assert_info
+&assert_core_name=&assert_core_name
+&assert_core_num=&assert_core_num
+&assert_root_core_name=&assert_root_core_name
+&assert_root_core_index=&assert_root_core_index
+
+&curr_script_dir=os.ppd()
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+
+; analyze assert info , case : "sdi_msg_iram.c" & "exp=Enqueue failed info"
+if (string.scan("&caller_assert_info","sdi_msg",0)!=-1)&&(string.scan("&caller_assert_info","exp=Enqueue failed info",0)!=-1)
+(
+  area.select &caller_assert_win
+  print "Assert Info: &caller_assert_info"
+  
+  ; v.f to file
+  do "&curr_script_dir\_trace32_var_frame.cmm" "&export_dir\v.f.txt" "&assert_root_core_index" "&assert_core_num"
+  
+  ; analyze v.f file
+  &has_TXAS_SystemAssert=0
+  &caller_TXAS_SystemAssert=""
+  &has_osa_fatal_error_handler_info=0
+  &caller_osa_fatal_error_handler_info=""
+  &has_ISR_Handler=0
+  local &myline
+  open #1 "&export_dir\v.f.txt" /read
+  read #1 %line &myline
+  while !file.eof(1)
+  (
+    print "  &myline"
+    if (string.scan("&myline","TXAS_SystemAssert(",0)!=-1)
+    (
+      &has_TXAS_SystemAssert=1
+      read #1 %line &myline
+      if (!file.eof(1))
+      (
+        print "  &myline"
+        if (string.scan("&myline","(",0)!=-1&&string.scan("&myline","|",0)!=-1)
+        (
+          &start_pos=string.scan("&myline","|",0)
+          &start_pos=&start_pos+1
+          &end_pos=string.scan("&myline","(",0)
+          &caller_TXAS_SystemAssert=string.mid("&myline",&start_pos,&end_pos-&start_pos)
+        )
+        if (string.scan("&myline","osa_fatal_error_handler_info(",0)!=-1)
+        (
+          &has_osa_fatal_error_handler_info=1
+          read #1 %line &myline
+          if (!file.eof(1))
+          (
+            print "  &myline"
+            if (string.scan("&myline","(",0)!=-1&&string.scan("&myline","|",0)!=-1)
+            (
+              &start_pos=string.scan("&myline","|",0)
+              &start_pos=&start_pos+1
+              &end_pos=string.scan("&myline","(",0)
+              &caller_osa_fatal_error_handler_info=string.mid("&myline",&start_pos,&end_pos-&start_pos)
+            )
+          )
+        )
+      )
+    )
+    else if (string.scan("&myline","ISR_Handler(",0)!=-1)
+    (
+      &has_ISR_Handler=1
+    )
+    read #1 %line &myline
+  )
+  close #1
+  
+  ; get thread entry
+  global &_global_osa_tx_thread_entry &_global_osa_tx_thread_doing &_global_osa_tx_thread_frame_counter &_global_is_entry_from_return_address
+  do "&curr_script_dir\_osa_tx_get_thread_entry.cmm" "&export_dir\v.f.txt" "&assert_root_core_index" "&assert_core_num"
+  if (&_global_is_entry_from_return_address==1)
+  (
+    &prev_caller_addr=register(r14)
+    print "  Find the entry by R14: &prev_caller_addr"
+  )
+  if ("&_global_osa_tx_thread_doing"!="")
+  (
+    global &_global_symbol_attr &_global_symbol_prototype &_global_symbol_source
+    do "&curr_script_dir\_trace32_symbol_info.cmm" "&export_dir\y.info.txt" "&_global_osa_tx_thread_doing"
+    print "  [Task doing: &_global_osa_tx_thread_doing] in [owner: &_global_symbol_source]"
+  )
+  if ("&_global_osa_tx_thread_entry"!="")
+  (
+    print "  [Task entry: &_global_osa_tx_thread_entry]"
+  )
+  
+  ; get thread name
+  global &_global_tx_thread_current_name
+  &_global_tx_thread_current_name=""
+  do "&curr_script_dir\_tx_thread_current_name.cmm" "&assert_root_core_index" "&assert_core_num"
+  if ("&_global_tx_thread_current_name"!="")
+  (
+    print "  [Task name: &_global_tx_thread_current_name]"
+  )
+  
+  ; handle seems_queue_full
+  if (v.value(&has_osa_fatal_error_handler_info)==v.value("1")&&("&caller_osa_fatal_error_handler_info"=="sdi_msg_send_to_ext_q"||"&caller_osa_fatal_error_handler_info"=="sdi_msg_send_timeout"))
+  (
+    &full_queue_thread_address=0
+    
+    ; get the full queue
+    global &_global_full_queue_address &_global_full_queue_name
+    do "&curr_script_dir\_tx_get_full_queue.cmm"
+
+    if ("&_global_full_queue_name"!="")
+    (
+      print "  [Analyze: Queue full] at queue [owner: &_global_full_queue_name] (&_global_full_queue_address)!"
+
+      ; get the full queue name
+      global &_global_full_queue_address &_global_full_queue_name
+      do "&curr_script_dir\_tx_get_full_queue.cmm"
+      
+      ; get thread key name by queue name
+      &thread_key_name="&_global_full_queue_name"
+      &thread_key_name=string.trim("&thread_key_name")
+      if (string.scan("&_global_full_queue_name", "Q_", 0)==0)
+      (
+        &start_pos=string.scan("&thread_key_name","Q_", 0)
+        &start_pos=&start_pos+2
+        &end_pos=string.length("&thread_key_name")
+        &thread_key_name=string.mid("&thread_key_name",&start_pos,&end_pos-&start_pos)
+      )
+      else if (string.scan("&_global_full_queue_name", " Q", 0)!=-1)
+      (
+        &start_pos=0
+        &end_pos=string.scan("&_global_full_queue_name"," Q", 0)
+        &thread_key_name=string.mid("&thread_key_name",&start_pos,&end_pos-&start_pos)
+      )
+      else if (string.scan("&_global_full_queue_name", "_QUEUE", 0)!=-1)
+      (
+        &start_pos=0
+        &end_pos=string.scan("&_global_full_queue_name","_QUEUE", 0)
+        &thread_key_name=string.mid("&thread_key_name",&start_pos,&end_pos-&start_pos)
+      )
+      else if (string.scan("&_global_full_queue_name", " ", 0)!=-1)
+      (
+        &thread_key_name=string.split("&thread_key_name", " ", 0)
+      )
+
+      ; get thread by key name
+      global &_global_thread_address &_global_thread_name
+      do "&curr_script_dir\_tx_get_thread_by_name.cmm" "&thread_key_name"
+      &full_queue_thread_address=&_global_thread_address
+    )
+    else
+    (
+      print "  [Analyze: Queue full] !"
+    )
+
+    ; get thread state of the queue full
+    &full_queue_thread_state=0
+    &max_priority=v.value(sizeof(_tx_thread_priority_list)/sizeof(_tx_thread_priority_list[0]))
+    &full_queue_thread_priority=v.value(&max_priority-1)
+    if (&_global_thread_address!=0)
+    (
+      if (v.value(sizeof(TX_THREAD))==0xd4) ; size is 212 (smp)
+      (
+        &full_queue_thread_state=v.value(((TX_THREAD*)&_global_thread_address)->tx_thread_state)
+        &full_queue_thread_priority=v.value(((TX_THREAD*)&_global_thread_address)->tx_thread_priority)
+      )
+      else
+      (
+        &full_queue_thread_state=v.value(((TX_THREAD*)&_global_thread_address)->tx_state)
+        &full_queue_thread_priority=v.value(((TX_THREAD*)&_global_thread_address)->tx_priority)
+      )
+    )
+
+    if (&full_queue_thread_state!=0)
+    (
+      ; view the frame of the full queue thread
+      &full_queue_thread_name=v.value(((TX_THREAD*)&_global_thread_address)->tx_thread_name)
+      &full_queue_thread_name=data.string(d:&full_queue_thread_name)
+      print "  [Analyze: Seems] the &full_queue_thread_name(&_global_thread_address) thread was not ready!"
+      do "&curr_script_dir\_trace32_print_task_frame.cmm" "&_global_thread_address" "    "
+    )
+    else
+    (
+      ; list ready threads
+      print "  List some ready threads (priority <= " format.decimal(0,&full_queue_thread_priority) ") suspected to have more CPU loading:" 
+      &priority=0
+      &max_priority=v.value(sizeof(_tx_thread_priority_list)/sizeof(_tx_thread_priority_list[0]))
+      
+      while (&priority<=&full_queue_thread_priority)
+      (
+        &head_thread=v.value(_tx_thread_priority_list[&priority])
+        if (&head_thread!=0)
+        (
+          &thread=&head_thread
+          
+CMM_READY_THREAD_LIST_LOOP:
+          &thread_id=v.value(((TX_THREAD*)&thread)->tx_thread_id)
+          &thread_next=0
+          if (v.value(sizeof(TX_THREAD))==0xd4) ; size is 212 (smp)
+          (
+            &thread_next=v.value(((TX_THREAD*)&thread)->tx_thread_ready_next)
+          )
+          else
+          (
+            &thread_next=v.value(((TX_THREAD*)&thread)->tx_ready_next)
+          )
+          &thread_name=v.value(((TX_THREAD*)&thread)->tx_thread_name)
+          &thread_name=data.string(d:&thread_name)
+          if (&thread_id!=0x54485244)
+          (
+            print "    0x" v.value(&thread) " tcb was demaged! [owner: &thread_name]"
+            goto CMM_READY_THREAD_LIST_NEXT
+          )
+          if ("&thread_name"!="System Timer Thread"&&"&thread_name"!="NVM Idle task")
+          (
+            if ((&thread_next==&thread)&&(&thread_next!=&head_thread))
+            (
+              print "    0x" v.value(&thread) " [owner: &thread_name], point to itself!"
+            )
+            else
+            (
+              print "    0x" v.value(&thread) " [owner: &thread_name]"
+            )
+          )
+          if ((&thread_next!=0)&&(&thread_next!=&head_thread))
+          (
+            if (&thread_next==&thread)
+            (
+              goto CMM_READY_THREAD_LIST_NEXT
+            )
+            &thread=&thread_next
+            goto CMM_READY_THREAD_LIST_LOOP
+          )
+        )
+CMM_READY_THREAD_LIST_NEXT:
+        &priority=&priority+1
+      )
+    )
+  )
+)
+
+enddo

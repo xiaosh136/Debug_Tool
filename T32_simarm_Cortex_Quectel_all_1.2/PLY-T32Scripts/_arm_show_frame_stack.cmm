@@ -1,0 +1,105 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  TX Component                                                                                          ;;
+;;                                                                                                        ;;
+;;    Basic: Show the basic info of cores (subsystem)                                                     ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; Create logging output window
+area.create show_frame_stack_win 200. 500.
+area.select show_frame_stack_win
+area.view show_frame_stack_win
+
+;PMACRO.list
+local &err
+&err=0
+
+; Enter the export directory if null
+global &_global_export_dir
+&curr_script_dir=os.ppd()
+do "&curr_script_dir\_setting_input_export_dir_if_null.cmm"
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Frame Stacks                                                                                           ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+print "Frame stack in TX:"
+&core_nums=v.value("sizeof(_tx_thread_current_ptr)/sizeof(TX_THREAD *)")
+&core_index=0
+print "{"
+while (&core_index<&core_nums)
+(
+
+  if (&core_index!=0)
+  (
+    print ""
+  )
+  
+  ; print v.f
+  do "&curr_script_dir\_trace32_print_var_frame.cmm" "&export_dir\v.f.txt" "&core_index" "&core_nums" "  "
+  
+  ; get thread entry
+  global &_global_osa_tx_thread_entry &_global_osa_tx_thread_doing &_global_osa_tx_thread_frame_counter
+  do "&curr_script_dir\_osa_tx_get_thread_entry.cmm" "&export_dir\v.f.txt" "&core_index" "&core_nums"
+  if ("&_global_osa_tx_thread_doing"!="")
+  (
+    global &_global_symbol_attr &_global_symbol_prototype &_global_symbol_source
+    do "&curr_script_dir\_trace32_symbol_info.cmm" "&export_dir\y.info.txt" "&_global_osa_tx_thread_doing"
+    print "  [Task doing: &_global_osa_tx_thread_doing] in [owner: &_global_symbol_source]"
+  )
+  if ("&_global_osa_tx_thread_entry"!="")
+  (
+    print "  [Task entry: &_global_osa_tx_thread_entry]"
+  )
+  
+  ; get thread name
+  global &_global_tx_thread_current_name
+  &_global_tx_thread_current_name=""
+  do "&curr_script_dir\_tx_thread_current_name.cmm" "&core_index" "&core_nums"
+  if ("&_global_tx_thread_current_name"!="")
+  (
+    print "  [Task name: &_global_tx_thread_current_name]"
+  )
+  
+  &core_index=&core_index+1
+)
+print "}"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  End                                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_END:
+area.select show_frame_stack_win
+
+enddo
+

@@ -1,0 +1,70 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  TX Component                                                                                          ;;
+;;                                                                                                        ;;
+;;    TX: _tx_thread_priority_list                                                                        ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+entry &caller_win &caller_lowest_priority
+
+; remove \"\"
+&caller_win=&caller_win
+&caller_lowest_priority=&caller_lowest_priority
+
+&priority=0
+&max_priority=v.value(sizeof(_tx_thread_priority_list)/sizeof(_tx_thread_priority_list[0]))
+if ("&caller_lowest_priority"!="")
+(
+  &max_priority=v.value("&caller_lowest_priority")
+  &max_priority=&max_priority+1
+)
+
+while (&priority<&max_priority)
+(
+  &thread=v.value(_tx_thread_priority_list[&priority])
+  if (&thread!=0)
+  (
+    &thread_next=&thread
+    
+CMM_READY_THREAD_LIST_LOOP:
+    if (v.value(sizeof(TX_THREAD))==0xd4) ; size is 212 (smp)
+    (
+      &thread_next=v.value(((TX_THREAD*)&thread_next)->tx_thread_ready_next)
+    )
+    else
+    (
+      &thread_next=v.value(((TX_THREAD*)&thread_next)->tx_ready_next)
+    )
+    &thread_name=v.value(((TX_THREAD*)&thread_next)->tx_thread_name)
+    print "  0x" v.value(&thread) " " data.string(d:&thread_name)
+    if ((&thread_next!=0)&&(&thread_next!=&thread))
+    (
+      goto CMM_READY_THREAD_LIST_LOOP
+    )
+  )
+  &priority=&priority+1
+)
+
+enddo

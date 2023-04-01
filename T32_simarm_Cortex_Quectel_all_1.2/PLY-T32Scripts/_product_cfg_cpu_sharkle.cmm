@@ -1,0 +1,177 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Product Config Component                                                                              ;;
+;;                                                                                                        ;;
+;;    The product config (memory layout) of SHARKLE                                                       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &cli_axf &cli_mem &cli_begin_address &cli_working_dir
+entry &cli_axf &cli_mem &cli_begin_address &cli_working_dir
+
+; remove \"\"
+&cli_axf=&cli_axf
+&cli_mem=&cli_mem
+&cli_begin_address=&cli_begin_address
+&cli_working_dir=&cli_working_dir
+
+;PMACRO.list
+local &err
+&err=0
+
+SYSTEM.CPU CORTEXR5
+SYSTEM.OPTION BIGENDIAN OFF
+SYSTEM.UP
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Select the working directory                                                                          ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+global &T32SimuPath
+global &_global_export_dir
+global &_global_working_dir
+
+LOCAL &T32_ROOT_DIR
+&T32_ROOT_DIR=OS.PSD()
+&T32SimuPath="&T32_ROOT_DIR\demo\arm\kernel\threadx"
+&curr_script_dir=OS.PPD()
+
+if ("&cli_working_dir"=="")
+(
+  print "Please input the working directory [&curr_script_dir]: "
+  enter &_global_working_dir
+  if ("&_global_working_dir"=="")
+  (
+    &_global_working_dir="&curr_script_dir"
+  )
+)
+else
+(
+  &_global_working_dir="&cli_working_dir"
+)
+
+&_global_export_dir="&_global_working_dir"
+title "TRACE32 Simulator [&_global_working_dir]"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Select the AXF file                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &axf_file_path
+if ("&cli_axf"=="")
+(
+  print "Select AXF file: "
+  DIALOG.FILE "&_global_working_dir\*.axf"
+  ENTRY %line &axf_file_path
+  if ("&axf_file_path"=="")
+  (
+    &err=1
+    goto CMM_END
+  )
+)
+else
+(
+  &axf_file_path="&cli_axf"
+)
+
+print "Load &axf_file_path ..."
+global &_global_axf_file_path
+&_global_axf_file_path="&axf_file_path"
+d.load "&axf_file_path"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Select the memory file                                                                                ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+&memory_begin_addr=0x89600000
+if (symbol.exist(Image$$EXEC_KERNEL_IMAGE0$$Base))
+(
+  &EXEC_KERNEL_IMAGE0_addr=v.value(&Image$$EXEC_KERNEL_IMAGE0$$Base)
+  &EXEC_KERNEL_IMAGE0_region_addr=&EXEC_KERNEL_IMAGE0_addr-0x600
+  if (&EXEC_KERNEL_IMAGE0_region_addr<0x89600000)
+  (
+    if (symbol.exist(mem_cfg))
+    (
+      &i=0
+      &count=v.value(sizeof(mem_cfg)/sizeof(mem_cfg[0]))
+      while (&i<&count)
+      (
+        &type=v.value(mem_cfg[&i].type)
+        &name=v.value(mem_cfg[&i].name)
+        &name=data.string(d:&name)
+        if (string.scan("&name","mem_size",0)!=-1)
+        (
+          &memory_begin_addr=v.value(mem_cfg[&i].start)
+          print "WARNING: Seems memory file does not begin at 0x89600000, EXEC_KERNEL_IMAGE0 : &EXEC_KERNEL_IMAGE0_region_addr ..."
+          print "WARNING: Seems memory file begins at &memory_begin_addr ... (wait a few seconds)"
+          wait 2s 
+          goto CMM_LOAD_MEM_FILE
+        )
+        print "0x" format.hex(8, ) " " format.decimal(9, v.value(mem_cfg[&i].size)) " " "&name"
+        &i=&i+1
+      )
+    )
+    
+    &err=1
+    print "ERROR: Seems memory file does not begin at 0x89600000, EXEC_KERNEL_IMAGE0 : &EXEC_KERNEL_IMAGE0_region_addr ..."
+    goto CMM_END
+  )
+)
+
+CMM_LOAD_MEM_FILE:
+local &mem_file_path
+if ("&cli_mem"=="")
+(
+  print "Select memory file: "
+  DIALOG.FILE "&_global_working_dir\*.mem"
+  ENTRY %line &mem_file_path
+  if ("&mem_file_path"=="")
+  (
+    &err=1
+    goto CMM_END
+  )
+)
+else
+(
+  &mem_file_path="&cli_mem"
+)
+
+print "Load memory file &mem_file_path at &memory_begin_addr ..."
+global &_global_mem_file_path
+&_global_mem_file_path="&mem_file_path"
+d.load.binary "&mem_file_path" &memory_begin_addr /noclear
+
+; Recover stack
+do "&curr_script_dir\_arm_recover_stack.cmm"
+
+CMM_END:
+
+if (&err!=0)
+(
+  enddo false()
+)
+else
+(
+  enddo true()
+)

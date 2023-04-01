@@ -1,0 +1,132 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  TM Component                                                                                          ;;
+;;                                                                                                        ;;
+;;    Task Monitor : Export the data to the host file                                                     ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;  2021/11/05      Yi.Yang                     Add Run Time Analysis                                                   ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;PMACRO.list
+local &err
+&err=0
+
+entry &tm_file_path &runtime_file_path
+
+; Enter the export directory if null
+global &_global_export_dir
+&curr_script_dir=os.ppd()
+do "&curr_script_dir\_setting_input_export_dir_if_null.cmm"
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+
+local &output_file_path
+local &output_file_name
+local &core_name
+if symbol.exist(LOG_magicHeader)
+(
+  &core_name=data.string(d:v.value(LOG_magicHeader.coreName))
+  &output_file_name="runtime_threadinfo_&(core_name).txt"
+)
+else
+(
+  &output_file_name="runtime_threadinfo.txt"
+)
+&output_file_path="&(export_dir)/&output_file_name"
+
+local &head_symbol_val &ptr
+local &created_cnt
+
+local &head_symbol
+&head_symbol="_tx_thread_created_ptr"
+if !(symbol.exist(&head_symbol))
+(
+  &err=1
+  print "Error: `_tx_thread_created_ptr' does not exist. EXIT script"
+  goto CMM_END
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Start ...                                                                                             ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Create output file
+area.create output_file_win 200. 500.
+area.open output_file_win "&output_file_path"
+area.select output_file_win
+
+&ptr=v.value((TX_THREAD*)&head_symbol)
+&head_symbol_val=v.value((TX_THREAD*)&head_symbol)
+
+CMM_LOOP_1:
+
+&thread_id=v.value(((TX_THREAD*)&ptr)->tx_thread_id)
+if (&thread_id==0x54485244)
+(
+  local &thread_string_addr &thread_priority &thread_created_next
+  if (v.value(sizeof(TX_THREAD))==0xd4) ; size is 212 (smp)
+  (
+    &name=v.value(((TX_THREAD*)&ptr)->tx_thread_name)
+	&name=data.string(d:&name)
+    &thread_priority=v.value(((TX_THREAD*)&ptr)->tx_thread_priority)
+    &thread_created_next=v.value(((TX_THREAD*)&ptr)->tx_thread_created_next)
+  )
+  else if (v.value(sizeof(TX_THREAD))==0xb0) ;cm4
+  (
+	&name=v.value(((TX_THREAD*)&ptr)->tx_thread_name)
+	&name=data.string(d:&name)
+    &thread_priority=v.value(((TX_THREAD*)&ptr)->tx_thread_priority)
+    &thread_created_next=v.value(((TX_THREAD*)&ptr)->tx_thread_created_next)
+  )
+  else
+  (
+    &name=v.value(((TX_THREAD*)&ptr)->tx_thread_name)
+	&name=data.string(d:&name)
+    &thread_priority=v.value(((TX_THREAD*)&ptr)->tx_priority)
+    &thread_created_next=v.value(((TX_THREAD*)&ptr)->tx_created_next)
+  )
+ 
+  print "&ptr(&name)    &thread_priority"
+  
+  &ptr_tmp=&thread_created_next
+  &ptr=&thread_created_next
+  
+  if (&ptr!=&head_symbol_val)&&(&ptr!=0)
+    goto CMM_LOOP_1
+)
+
+area.close output_file_win
+area.clear output_file_win
+
+OS.Command &curr_script_dir\run_py.bat "&curr_script_dir\_analyze_task_runtime.py" &tm_file_path &output_file_path &runtime_file_path
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  End                                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+CMM_END:
+wait 1.s
+enddo

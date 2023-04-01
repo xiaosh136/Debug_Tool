@@ -1,0 +1,314 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  TX Component                                                                                          ;;
+;;                                                                                                        ;;
+;;    Basic: Analyze the exception stacks                                                                 ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/06/19      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; Create logging output window
+area.create analyze_except_stacks_win 200. 500.
+area.select analyze_except_stacks_win
+area.view analyze_except_stacks_win
+
+global &_global_export_dir
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Start ...                                                                                             ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;
+; \MS_Code\chip_drv\chip_module\init\cp\tx_illdb_armv7.s
+; TXILLDB_FIQ_STACK_SIZE:      dcd     0x9B2EC414       ; g_fiq_stack_size
+; TXILLDB_FIQ_STACK:           dcd     0x9B2EC43C       ; g_fiq_stack_base
+; TXILLDB_IRQ_STACK:           dcd     0x9B2EC440       ; g_irq_stack_base
+; TXILLDB_ABORT_STACK:         dcd     0x9B2EC444       ; g_abort_stack_base
+; TXILLDB_SYS_TIMER_STACK:     dcd     0x9B2EC448       ; g_sys_timer_stack_base
+; TXILLDB_IRQ_STACK_SIZE:      dcd     0x9B2EC418       ; g_irq_stack_size
+; TXILLDB_UNDEFINE_STACK_SIZE: dcd     0x9B2EC41C       ; g_undefine_stack_size
+; TXILLDB_ABORT_STACK_SIZE:    dcd     0x9B2EC420       ; g_abort_stack_size
+; TXILLDB_SYS_STACK_SIZE:      dcd     0x9B2EC424       ; g_sys_stack_size
+; TXILLDB_TIM_STACK_SIZE:      dcd     0x9B2EC428       ; g_timer_stack_size
+; TXILLDB_SVC_STACK:           dcd     0x9B2EC434       ; g_svc_stack_limit_add
+; 
+
+if (symbol.exist(g_abort_stack_base))
+(
+  &name="abort stack"
+  &stack_base=v.value(g_abort_stack_base)
+  &stack_size=v.value(g_abort_stack_size)
+  
+  &start=&stack_base
+  &end=&stack_base+&stack_size
+  print ""
+  print "Analyze &name: " "0x" v.value(&start) " - 0x" v.value(&end) ", length: 0x" v.value(&end-&start)
+  print "{"
+  while (v.value(&start)<v.value(&end))
+  (
+    &value=v.value(*(unsigned int *)&start)
+    &name=symbol.function(p:v.value(&value))
+    if ("&name")!=""
+    (
+      &offset=-1
+      local &res
+      &res=string.scan("&name", "\", 0)
+      while (v.value(&res)>=v.value(&offset))
+      (
+        &offset=&res+1
+        &res=string.scan("&name", "\", v.value(&offset))
+      )
+      if (v.value(&offset)==v.value("-1"))
+      (
+        print "  [0x" v.value(&start) "] " "0x" v.value(&value) " " "&name"
+      )
+      else
+      (
+        &name_len=string.length("&name")
+        &sub_name=string.mid("&name",v.value(&offset),v.value(&name_len))
+        print "  [0x" v.value(&start) "] " "0x" v.value(&value) " " "&sub_name"
+      )
+    )
+    &start=&start+0x4
+  )
+  print "}"
+)
+
+
+if (symbol.exist(g_irq_stack_base))
+(
+  &name="irq stack"
+  &stack_base=v.value(g_irq_stack_base)
+  &stack_size=v.value(g_irq_stack_size)
+  
+  &start=&stack_base
+  &end=&stack_base+&stack_size
+  print ""
+  print "Analyze &name: " "0x" v.value(&start) " - 0x" v.value(&end) ", length: 0x" v.value(&end-&start)
+  print "{"
+  while (v.value(&start)<v.value(&end))
+  (
+    &value=v.value(*(unsigned int *)&start)
+    &name=symbol.function(p:v.value(&value))
+    if ("&name")!=""
+    (
+      &offset=-1
+      local &res
+      &res=string.scan("&name", "\", 0)
+      while (v.value(&res)>=v.value(&offset))
+      (
+        &offset=&res+1
+        &res=string.scan("&name", "\", v.value(&offset))
+      )
+      if (v.value(&offset)==v.value("-1"))
+      (
+        print "  [0x" v.value(&start) "] " "0x" v.value(&value) " " "&name"
+      )
+      else
+      (
+        &name_len=string.length("&name")
+        &sub_name=string.mid("&name",v.value(&offset),v.value(&name_len))
+        print "  [0x" v.value(&start) "] " "0x" v.value(&value) " " "&sub_name"
+      )
+    )
+    &start=&start+0x4
+  )
+  print "}"
+)
+
+
+if (symbol.exist(g_sys_stack_base))
+(
+  &name="undef stack" ; "undef + sys"
+  &stack_base=v.value(g_sys_stack_base)
+  &stack_size=v.value(g_undefine_stack_size)
+  
+  &start=&stack_base
+  &end=&stack_base+&stack_size
+  print ""
+  print "Analyze &name: " "0x" v.value(&start) " - 0x" v.value(&end) ", length: 0x" v.value(&end-&start)
+  print "{"
+  while (v.value(&start)<v.value(&end))
+  (
+    &value=v.value(*(unsigned int *)&start)
+    &name=symbol.function(p:v.value(&value))
+    if ("&name")!=""
+    (
+      &offset=-1
+      local &res
+      &res=string.scan("&name", "\", 0)
+      while (v.value(&res)>=v.value(&offset))
+      (
+        &offset=&res+1
+        &res=string.scan("&name", "\", v.value(&offset))
+      )
+      if (v.value(&offset)==v.value("-1"))
+      (
+        print "  [0x" v.value(&start) "] " "0x" v.value(&value) " " "&name"
+      )
+      else
+      (
+        &name_len=string.length("&name")
+        &sub_name=string.mid("&name",v.value(&offset),v.value(&name_len))
+        print "  [0x" v.value(&start) "] " "0x" v.value(&value) " " "&sub_name"
+      )
+    )
+    &start=&start+0x4
+  )
+  print "}"
+)
+
+
+if (symbol.exist(g_sys_stack_base))
+(
+  &name="sys stack" ; "undef + sys"
+  &stack_base=v.value(g_sys_stack_base)+v.value(g_undefine_stack_size)
+  &stack_size=v.value(g_sys_stack_size)
+  
+  &start=&stack_base
+  &end=&stack_base+&stack_size
+  print ""
+  print "Analyze &name: " "0x" v.value(&start) " - 0x" v.value(&end) ", length: 0x" v.value(&end-&start)
+  print "{"
+  while (v.value(&start)<v.value(&end))
+  (
+    &value=v.value(*(unsigned int *)&start)
+    &name=symbol.function(p:v.value(&value))
+    if ("&name")!=""
+    (
+      &offset=-1
+      local &res
+      &res=string.scan("&name", "\", 0)
+      while (v.value(&res)>=v.value(&offset))
+      (
+        &offset=&res+1
+        &res=string.scan("&name", "\", v.value(&offset))
+      )
+      if (v.value(&offset)==v.value("-1"))
+      (
+        print "  [0x" v.value(&start) "] " "0x" v.value(&value) " " "&name"
+      )
+      else
+      (
+        &name_len=string.length("&name")
+        &sub_name=string.mid("&name",v.value(&offset),v.value(&name_len))
+        print "  [0x" v.value(&start) "] " "0x" v.value(&value) " " "&sub_name"
+      )
+    )
+    &start=&start+0x4
+  )
+  print "}"
+)
+
+
+if (symbol.exist(g_svc_stack_base))
+(
+  &name="svc stack"
+  &stack_base=v.value(g_svc_stack_base)
+  &stack_size=v.value(g_svc_stack_size)
+  
+  &start=&stack_base
+  &end=&stack_base+&stack_size
+  print ""
+  print "Analyze &name: " "0x" v.value(&start) " - 0x" v.value(&end) ", length: 0x" v.value(&end-&start)
+  print "{"
+  while (v.value(&start)<v.value(&end))
+  (
+    &value=v.value(*(unsigned int *)&start)
+    &name=symbol.function(p:v.value(&value))
+    if ("&name")!=""
+    (
+      &offset=-1
+      local &res
+      &res=string.scan("&name", "\", 0)
+      while (v.value(&res)>=v.value(&offset))
+      (
+        &offset=&res+1
+        &res=string.scan("&name", "\", v.value(&offset))
+      )
+      if (v.value(&offset)==v.value("-1"))
+      (
+        print "  [0x" v.value(&start) "] " "0x" v.value(&value) " " "&name"
+      )
+      else
+      (
+        &name_len=string.length("&name")
+        &sub_name=string.mid("&name",v.value(&offset),v.value(&name_len))
+        print "  [0x" v.value(&start) "] " "0x" v.value(&value) " " "&sub_name"
+      )
+    )
+    &start=&start+0x4
+  )
+  print "}"
+)
+else if (symbol.exist(g_svc_stack_limit_add))
+(
+  &name="svc stack"
+  &stack_base=v.value(g_svc_stack_limit_add)-0x800
+  &stack_size=0x800
+  
+  &start=&stack_base
+  &end=&stack_base+&stack_size
+  print ""
+  print "Analyze &name: " "0x" v.value(&start) " - 0x" v.value(&end) ", length: 0x" v.value(&end-&start)
+  print "{"
+  while (v.value(&start)<v.value(&end))
+  (
+    &value=v.value(*(unsigned int *)&start)
+    &name=symbol.function(p:v.value(&value))
+    if ("&name")!=""
+    (
+      &offset=-1
+      local &res
+      &res=string.scan("&name", "\", 0)
+      while (v.value(&res)>=v.value(&offset))
+      (
+        &offset=&res+1
+        &res=string.scan("&name", "\", v.value(&offset))
+      )
+      if (v.value(&offset)==v.value("-1"))
+      (
+        print "  [0x" v.value(&start) "] " "0x" v.value(&value) " " "&name"
+      )
+      else
+      (
+        &name_len=string.length("&name")
+        &sub_name=string.mid("&name",v.value(&offset),v.value(&name_len))
+        print "  [0x" v.value(&start) "] " "0x" v.value(&value) " " "&sub_name"
+      )
+    )
+    &start=&start+0x4
+  )
+  print "}"
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  End                                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_END:
+area.select analyze_except_stacks_win
+
+enddo
+

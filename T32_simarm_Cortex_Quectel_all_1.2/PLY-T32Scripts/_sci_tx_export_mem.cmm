@@ -1,0 +1,174 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  SCI/TX Component                                                                                      ;;
+;;                                                                                                        ;;
+;;    Memory: Save the allocations of memory info into the HOST file.                                     ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; Create logging output window
+area.create logging_win 200. 500.
+area.select logging_win
+area.view logging_win
+
+;PMACRO.list
+local &err
+&err=0
+
+; Enter the export directory if null
+global &_global_export_dir
+&curr_script_dir=os.ppd()
+do "&curr_script_dir\_setting_input_export_dir_if_null.cmm"
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+
+; Makeup output file path
+local &output_file_path
+local &output_file_name
+local &core_name
+if y.exist(LOG_magicHeader)
+(
+  &core_name=data.string(d:v.value(LOG_magicHeader.coreName))
+  &output_file_name="sci_tx_allocinfo_&(core_name).txt"
+)
+else
+(
+  &output_file_name="sci_tx_allocinfo.txt"
+)
+&output_file_path="&(export_dir)/&output_file_name"
+
+print "Export to directory : &(export_dir)"
+print "Start time : " clock.date() "  " clock.time() "  ..."
+print ""
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Start ...                                                                                             ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &head_symbol &head_symbol_val &ptr
+&head_symbol="dbg_head"
+if !(symbol.exist(&head_symbol))
+(
+  &err=1
+  print "Error: `dbg_head' does not exist. EXIT script"
+  goto CMM_END
+)
+
+; Create output file
+area.create output_file_win 200. 500.
+area.open output_file_win "&output_file_path"
+area.select output_file_win
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  POOL USED COUNTER INFO                                                                                ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+print "===============pool_used_counter info==============="
+print " pool_step    pool_counter      step_max_used"
+
+&pool_counter_num=v.value(pool_counter_num)
+&pool_count_step=v.value(pool_count_step)
+&i=0
+
+CMM_LOOP_1:
+
+&n_pool=format.decimal(4,&pool_count_step*&i)
+&n_pool_step=format.decimal(4,(&pool_count_step*(&i+1)-1))
+&n_pool_count=format.decimal(12,v.value(pool_counter[&i]))
+&n_step_max_used=format.decimal(13,v.value(step_max_used[&i]))
+print " &(n_pool) &(n_pool_step) &(n_pool_count) &(n_step_max_used) "
+&i=&i+1
+if &i<&pool_counter_num
+  goto CMM_LOOP_1
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Allocated memory info(BLOCK)                                                                          ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+print ""
+print "===============Allocated memory info(in block pool)==============="
+print "     No.    Size      FileName    (Line)     Addr   "
+
+
+&head_symbol_val=address.offset(&head_symbol)
+&ptr=v.value(&head_symbol.succ)
+
+CMM_LOOP_2:
+
+; Check address of ptr
+;&hdr_stamp=v.value(((struct MEM_HEADER_tag*)&ptr)->hdr_stamp)
+;if &hdr_stamp!=0xF1F1F1F1
+;(
+;  print "BLOCK memory is corrupted, abnormal termination"
+;  goto CMM_FILE_CLOSE
+;)
+
+&num=format.decimal(8,v.value(((struct MEM_HEADER_tag*)&ptr)->block_num))
+&size=format.decimal(8,v.value(((struct MEM_HEADER_tag*)&ptr)->size))
+&line=format.decimal(8,v.value(((struct MEM_HEADER_tag*)&ptr)->line))
+&file=data.string(d:v.value(((struct MEM_HEADER_tag*)&ptr)->file_name))
+print  "&(num) &(size) &(file) &(line) &(ptr)"
+
+&ptr_tmp=v.value(((struct MEM_HEADER_tag*)&ptr)->succ)
+&ptr=&ptr_tmp
+
+if (&ptr!=&head_symbol_val)&&(&ptr!=0)
+  goto CMM_LOOP_2
+
+
+CMM_FILE_CLOSE:
+print ""
+area.close output_file_win
+area.clear output_file_win
+
+type "&output_file_path"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  End                                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+goto CMM_END
+
+CMM_END:
+area.select logging_win
+
+print ""
+print "End time : " clock.date() "  " clock.time() "  "
+
+; Close the logging output window
+; wait 1s
+if (&err==0)
+(
+  area.close logging_win
+  do "&curr_script_dir\_trace32_area_delete.cmm" "logging_win"
+)
+
+enddo

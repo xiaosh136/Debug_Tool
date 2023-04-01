@@ -1,0 +1,56 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  TX Component                                                                                          ;;
+;;                                                                                                        ;;
+;;    TX: _tx_thread_current_name                                                                         ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+global &_global_tx_thread_current_ptr
+global &_global_tx_thread_current_name
+entry &caller_core_index &caller_core_num
+
+; remove \"\"
+&caller_core_index=&caller_core_index
+&caller_core_num=&caller_core_num
+
+&_global_tx_thread_current_ptr=0
+&_global_tx_thread_current_name=""
+ 
+if (v.value(&caller_core_num)>v.value("1"))
+(
+  &_global_tx_thread_current_ptr=v.value(_tx_thread_current_ptr[&caller_core_index])
+)
+else
+(
+  &_global_tx_thread_current_ptr=v.value(_tx_thread_current_ptr)
+)
+
+if (v.value(&_global_tx_thread_current_ptr)!=v.value(0))
+(
+  &_global_tx_thread_current_name=v.value(((TX_THREAD *)&_global_tx_thread_current_ptr)->tx_thread_name)
+  &_global_tx_thread_current_name=data.string(d:&_global_tx_thread_current_name)
+)
+
+enddo

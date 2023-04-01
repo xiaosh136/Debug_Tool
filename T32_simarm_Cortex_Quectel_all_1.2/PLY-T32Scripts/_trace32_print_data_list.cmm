@@ -1,0 +1,83 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  TRACE32 Component                                                                                     ;;
+;;                                                                                                        ;;
+;;    TRACE32 : data.list                                                                                 ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+local &caller_win &caller_addr &caller_end_addr &caller_core_index &caller_core_num &caller_print_prefix
+entry &caller_win &caller_addr &caller_end_addr &caller_core_index &caller_core_num &caller_print_prefix
+
+; remove \"\"
+&caller_win=&caller_win
+&caller_addr=&caller_addr
+&caller_end_addr=&caller_end_addr
+&caller_core_index=&caller_core_index
+&caller_core_num=&caller_core_num
+&caller_print_prefix=&caller_print_prefix
+
+global &_global_first_code_line
+&_global_first_code_line=""
+
+do "&curr_script_dir\_trace32_data_list.cmm" "&caller_addr" "&export_dir\tmp_trace32_print_data_list.txt" "&caller_core_index" "&caller_core_num"
+
+local &code_line &first_code_line
+&first_code_line=""
+open #2 "&export_dir\tmp_trace32_print_data_list.txt" /read
+read #2 %line &code_line
+while !file.eof(2)
+(
+  if (string.scan("&code_line","ST:",0)!=-1)
+  (
+    &start_pos=string.scan("&code_line","ST:",0)
+    &start_pos=&start_pos+3
+    &end_pos=string.scan("&code_line","|",0)
+    &addr=string.mid("&code_line",&start_pos,&end_pos-&start_pos)
+    &addr=v.value("0x&addr")
+    if ("&first_code_line"=="")
+    (
+      &first_code_line="&code_line"
+    )
+    if (&addr>=&caller_end_addr)
+    (
+      goto CMM_ANALYZE_DATA_LIST_END
+    )
+    
+    &start_pos=string.scan("&code_line","ST:",0)
+    &end_pos=string.length("&code_line")
+    &print_str=string.mid("&code_line",&start_pos,&end_pos-&start_pos)
+    print "&caller_print_prefix&print_str"
+  )
+  read #2 %line &code_line
+)
+
+CMM_ANALYZE_DATA_LIST_END:
+close #2
+del "&export_dir\tmp_trace32_print_data_list.txt"
+&_global_first_code_line="&first_code_line"
+
+enddo
+

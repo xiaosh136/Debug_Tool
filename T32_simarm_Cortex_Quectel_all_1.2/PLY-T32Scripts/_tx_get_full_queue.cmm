@@ -1,0 +1,101 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  TX Component                                                                                          ;;
+;;                                                                                                        ;;
+;;    Queue: Get the full queue address                                                                   ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+global &_global_full_queue_address
+global &_global_full_queue_name
+&_global_full_queue_address=0
+&_global_full_queue_name=""
+
+;PMACRO.list
+local &err
+&err=0
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Start ...                                                                                             ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &head_symbol
+&head_symbol="_tx_queue_created_ptr"
+if !(symbol.exist(&head_symbol))
+(
+  &err=1
+  print "Error: `&head_symbol' does not exist. EXIT script"
+  goto CMM_END
+)
+
+local &head_symbol_val &ptr
+local &created_cnt
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Enqueued Queue Info                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+&created_cnt=0
+&ptr=v.value((TX_QUEUE*)&head_symbol)
+&head_symbol_val=v.value((TX_QUEUE*)&head_symbol)
+
+CMM_LOOP_1:
+
+&queue_id=v.value(((TX_QUEUE*)&ptr)->tx_queue_id)
+if (&queue_id==0x51554555)
+(
+  &queue_string_addr=v.value(((TX_QUEUE*)&ptr)->tx_queue_name)
+  &queue_message_size=v.value(((TX_QUEUE*)&ptr)->tx_queue_message_size)
+  &queue_capacity=v.value(((TX_QUEUE*)&ptr)->tx_queue_capacity)
+  &queue_enqueued=v.value(((TX_QUEUE*)&ptr)->tx_queue_enqueued)
+  &queue_available_storage=v.value(((TX_QUEUE*)&ptr)->tx_queue_available_storage)
+  &queue_suspended_count=v.value(((TX_QUEUE*)&ptr)->tx_queue_suspended_count)
+  if (v.value(&queue_enqueued)>v.value("0"))
+  (
+    if (&queue_capacity==&queue_enqueued)
+    (
+      &_global_full_queue_address=&ptr
+      &_global_full_queue_name=data.string(d:&queue_string_addr)
+      goto CMM_END
+    )
+  )
+  
+  &ptr_tmp=v.value(((TX_QUEUE*)&ptr)->tx_queue_created_next)
+  &ptr=&ptr_tmp
+  &created_cnt=&created_cnt+1
+  
+  if (&ptr!=&head_symbol_val)&&(&ptr!=0)
+    goto CMM_LOOP_1
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  End                                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_END:
+
+enddo
+

@@ -1,0 +1,192 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  LOG Component                                                                                         ;;
+;;                                                                                                        ;;
+;;    LOG : Save the ring share memory list info into the HOST file.                                      ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; Create logging output window
+area.create logging_win 200. 500.
+area.select logging_win
+area.view logging_win
+
+;PMACRO.list
+local &err
+&err=0
+
+; Enter the export directory if null
+global &_global_export_dir
+&curr_script_dir=os.ppd()
+do "&curr_script_dir\_setting_input_export_dir_if_null.cmm"
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+
+; Makeup output file path
+local &output_file_path
+local &output_file_name
+local &core_name
+if symbol.exist(LOG_magicHeader)
+(
+  &core_name=data.string(d:v.value(LOG_magicHeader.coreName))
+  &output_file_name="log_ring_shmem_list_&(core_name).txt"
+)
+else
+(
+  &output_file_name="log_ring_shmem_list.txt"
+)
+&output_file_path="&(export_dir)/&output_file_name"
+
+print "Export to directory : &(export_dir)"
+print "Start time : " clock.date() "  " clock.time() "  ..."
+print ""
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Start ...                                                                                             ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+if !(symbol.exist(g_proto_sblock))
+(
+  &err=1
+  print "Error: `g_proto_sblock' does not exist. EXIT script"
+  goto CMM_END
+)
+
+; Create output file
+area.create output_file_win 200. 500.
+area.open output_file_win "&output_file_path"
+area.select output_file_win
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Share memory list                                                                                     ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+&sblock_res_handle=v.value(g_proto_sblock[0].sblock)
+&ring_txblk_blks=v.value(((SBLOCK_RES_T*)&sblock_res_handle)->header->ring.txblk_blks)
+&ring_txblk_rdptr=v.value(((SBLOCK_RES_T*)&sblock_res_handle)->header->ring.txblk_rdptr)
+&ring_txblk_wrptr=v.value(((SBLOCK_RES_T*)&sblock_res_handle)->header->ring.txblk_wrptr)
+&ring_txblk_count=v.value(((SBLOCK_RES_T*)&sblock_res_handle)->header->ring.txblk_count)
+&pool_txblk_blks=v.value(((SBLOCK_RES_T*)&sblock_res_handle)->header->pool.txblk_blks)
+&pool_txblk_rdptr=v.value(((SBLOCK_RES_T*)&sblock_res_handle)->header->pool.txblk_rdptr)
+&pool_txblk_wrptr=v.value(((SBLOCK_RES_T*)&sblock_res_handle)->header->pool.txblk_wrptr)
+&pool_txblk_count=v.value(((SBLOCK_RES_T*)&sblock_res_handle)->header->pool.txblk_count)
+
+&txblk_blks=&ring_txblk_blks
+&txblk_rdptr=&ring_txblk_rdptr
+&txblk_wrptr=&ring_txblk_wrptr
+&txblk_count=&ring_txblk_count
+&txblk_count_fmt=format.decimal(4,v.value(&ring_txblk_count))
+&txblk_rdptr_fmt=format.decimal(4,v.value(&ring_txblk_rdptr))
+&txblk_wrptr_fmt=format.decimal(4,v.value(&ring_txblk_wrptr))
+
+print " .txblk_blks = &txblk_blks"
+print " .txblk_count = &txblk_count_fmt"
+print " .txblk_rdptr = &txblk_rdptr_fmt"
+print " .txblk_wrptr = &txblk_wrptr_fmt"
+
+&blk_rd_index=v.value(&txblk_rdptr%&txblk_count)
+&blk_wr_index=v.value(&txblk_wrptr%&txblk_count)
+&blk_initial_index=v.value(&txblk_wrptr%&txblk_count)
+&blk_index=&blk_initial_index
+&blk_count=&txblk_count
+
+print "===============Ring Shmem List ==============="
+print "  Index         ShareMem  Size"
+
+CMM_LOOP_1:
+&index=format.decimal(4,v.value(&blk_index))
+&item_addr=v.value(&(((SBLOCK_T*)&txblk_blks)[&index]))
+&item_addr_fmt=format.hex(8,v.value(&item_addr))
+&addr=v.value((((SBLOCK_T*)&txblk_blks)[&index]).addr)
+&addr_fmt=format.hex(8,v.value(&addr))
+&length=v.value((((SBLOCK_T*)&txblk_blks)[&index]).length)
+&length_fmt=format.decimal(4,v.value(&length))
+
+if (&blk_index==&blk_rd_index&&&blk_index==&blk_wr_index)
+(
+  if (&txblk_rdptr==&txblk_wrptr)
+  (
+    print  "=&index &item_addr_fmt: &addr_fmt &length_fmt"
+  )
+  else
+  (
+    print  "F&index &item_addr_fmt: &addr_fmt &length_fmt"
+  )
+)
+else if (&blk_index==&blk_rd_index)
+(
+  print  ">&index &item_addr_fmt: &addr_fmt &length_fmt"
+)
+else if (&blk_index==&blk_wr_index)
+(
+  print  "<&index &item_addr_fmt: &addr_fmt &length_fmt"
+)
+else
+(
+  print  " &index &item_addr_fmt: &addr_fmt &length_fmt"
+)
+
+&blk_index=&blk_index+1
+if (&blk_index==&blk_count)
+(
+  &blk_index=0
+)
+if (&blk_index!=&blk_initial_index)
+(
+	goto CMM_LOOP_1
+)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  End                                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_FILE_CLOSE:
+print ""
+area.close output_file_win
+area.clear output_file_win
+
+type "&output_file_path"
+
+CMM_END:
+area.select logging_win
+
+print ""
+print "End time : " clock.date() "  " clock.time() "  "
+
+; Close the logging output window
+; wait 1s
+if (&err==0)
+(
+  area.close logging_win
+  do "&curr_script_dir\_trace32_area_delete.cmm" "logging_win"
+)
+
+enddo

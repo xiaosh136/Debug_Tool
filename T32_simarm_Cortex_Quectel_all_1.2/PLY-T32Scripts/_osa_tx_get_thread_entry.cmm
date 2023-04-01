@@ -1,0 +1,501 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  OSA/TX Component                                                                                      ;;
+;;                                                                                                        ;;
+;;    OSA/TX: Get the thread entry.                                                                       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+global &_global_osa_tx_thread_entry &_global_osa_tx_thread_doing &_global_osa_tx_thread_frame_counter &_global_is_entry_from_return_address &_global_thread_timer_callback
+&_global_osa_tx_thread_entry=""
+&_global_osa_tx_thread_doing=""
+&_global_is_entry_from_return_address=0
+&_global_thread_timer_callback=""
+local &caller_export_v_f_file &caller_core_index &caller_core_num
+entry &caller_export_v_f_file &caller_core_index &caller_core_num
+
+; remove \"\"
+&caller_export_v_f_file=&caller_export_v_f_file
+&caller_core_index=&caller_core_index
+&caller_core_num=&caller_core_num
+
+;PMACRO.list
+local &err
+&err=0
+&curr_script_dir=os.ppd()
+&export_dir="&_global_export_dir"
+if ("&caller_export_v_f_file"=="")
+(
+  &caller_export_v_f_file="&export_dir\v.f.txt"
+)
+
+; v.f to file
+do "&curr_script_dir\_trace32_var_frame.cmm" "&caller_export_v_f_file" "&caller_core_index" "&caller_core_num"
+
+; analyze v.f file
+&frame_counter=0
+&doing_line=""
+&prevline=""
+&task_entry=""
+&prev_func=""
+&curr_func=""
+
+&has_TXAS_SystemAssert=0
+&caller_TXAS_SystemAssert=""
+&has_osa_fatal_error_handler_info=0
+&caller_osa_fatal_error_handler_info=""
+&has_xxx=0
+&has_SCI_xxx=0
+&caller_SCI_xxx=""
+&has_osa_xxx=0
+&caller_osa_xxx=""
+&has_sdi_xxx=0
+&caller_sdi_xxx=""
+&has_osa_timer_routine_wraper=0
+&callee_osa_timer_routine_wraper=""
+&has_entry=0
+&callee_entry=""
+
+local &myline
+open #1 "&caller_export_v_f_file" /read
+read #1 %line &myline
+while !file.eof(1)
+(
+  if (string.scan("&myline","-",0)!=-1&&string.scan("&myline","|",0)!=-1&&string.scan("&myline","end of frame",0)==-1)
+  (
+    &frame_counter=&frame_counter+1
+  )
+  
+  &curr_func=""
+  if (string.scan("&myline","(",0)!=-1&&string.scan("&myline","|",0)!=-1)
+  (
+    &start_pos=string.scan("&myline","|",0)
+    &start_pos=&start_pos+1
+    &end_pos=string.scan("&myline","(",0)
+    &curr_func=string.mid("&myline",&start_pos,&end_pos-&start_pos)
+    if (string.scan("&myline","(inline)",0)!=-1)
+    (
+      read #1 %line &myline
+      if (!file.eof(1))
+      (
+        &prev_func="&curr_func"
+        &curr_func=""
+        if (string.scan("&myline","(",0)!=-1&&string.scan("&myline","|",0)!=-1)
+        (
+          &start_pos=string.scan("&myline","|",0)
+          &start_pos=&start_pos+1
+          &end_pos=string.scan("&myline","(",0)
+          &curr_func=string.mid("&myline",&start_pos,&end_pos-&start_pos)
+        )
+      )
+    )
+  )
+  if (string.scan("&myline","-000|",0)!=-1)
+  (
+    if ("&doing_line"=="")
+    (
+      &doing_line="&curr_func"
+    )
+  )
+  if ("&curr_func"=="TXAS_SystemAssert")
+  (
+    &has_TXAS_SystemAssert=1
+    read #1 %line &myline
+    if (!file.eof(1))
+    (
+      &prev_func="&curr_func"
+      &curr_func=""
+      if (string.scan("&myline","(",0)!=-1&&string.scan("&myline","|",0)!=-1)
+      (
+        &start_pos=string.scan("&myline","|",0)
+        &start_pos=&start_pos+1
+        &end_pos=string.scan("&myline","(",0)
+        &curr_func=string.mid("&myline",&start_pos,&end_pos-&start_pos)
+        if (string.scan("&myline","(inline)",0)!=-1)
+        (
+          read #1 %line &myline
+          if (!file.eof(1))
+          (
+            &prev_func="&curr_func"
+            &curr_func=""
+            if (string.scan("&myline","(",0)!=-1&&string.scan("&myline","|",0)!=-1)
+            (
+              &start_pos=string.scan("&myline","|",0)
+              &start_pos=&start_pos+1
+              &end_pos=string.scan("&myline","(",0)
+              &curr_func=string.mid("&myline",&start_pos,&end_pos-&start_pos)
+            )
+          )
+        )
+      )
+      &caller_TXAS_SystemAssert="&curr_func"
+    )
+  )
+  if ("&curr_func"=="osa_fatal_error_handler_info")
+  (
+    &has_osa_fatal_error_handler_info=1
+    read #1 %line &myline
+    if (!file.eof(1))
+    (
+      &prev_func="&curr_func"
+      &curr_func=""
+      if (string.scan("&myline","(",0)!=-1&&string.scan("&myline","|",0)!=-1)
+      (
+        &start_pos=string.scan("&myline","|",0)
+        &start_pos=&start_pos+1
+        &end_pos=string.scan("&myline","(",0)
+        &curr_func=string.mid("&myline",&start_pos,&end_pos-&start_pos)
+        if (string.scan("&myline","(inline)",0)!=-1)
+        (
+          read #1 %line &myline
+          if (!file.eof(1))
+          (
+            &prev_func="&curr_func"
+            &curr_func=""
+            if (string.scan("&myline","(",0)!=-1&&string.scan("&myline","|",0)!=-1)
+            (
+              &start_pos=string.scan("&myline","|",0)
+              &start_pos=&start_pos+1
+              &end_pos=string.scan("&myline","(",0)
+              &curr_func=string.mid("&myline",&start_pos,&end_pos-&start_pos)
+            )
+          )
+        )
+      )
+      &caller_osa_fatal_error_handler_info="&curr_func"
+    )
+  )
+  if ((("&prev_func"=="TXAS_SystemAssert")||("&prev_func"=="osa_fatal_error_handler_info"))&&(string.scan("&curr_func","SCI_",0)==0))
+  (
+    ; SCI_xxx call TXAS_SystemAssert or osa_fatal_error_handler_info
+CMM_SCI_xxx_LOOP:
+    &has_xxx=&has_xxx+1
+    &has_SCI_xxx=&has_xxx
+    read #1 %line &myline
+    if (!file.eof(1))
+    (
+      &prev_func="&curr_func"
+      &curr_func=""
+      if (string.scan("&myline","(",0)!=-1&&string.scan("&myline","|",0)!=-1)
+      (
+        &start_pos=string.scan("&myline","|",0)
+        &start_pos=&start_pos+1
+        &end_pos=string.scan("&myline","(",0)
+        &curr_func=string.mid("&myline",&start_pos,&end_pos-&start_pos)
+        if (string.scan("&myline","(inline)",0)!=-1)
+        (
+          read #1 %line &myline
+          if (!file.eof(1))
+          (
+            &prev_func="&curr_func"
+            &curr_func=""
+            if (string.scan("&myline","(",0)!=-1&&string.scan("&myline","|",0)!=-1)
+            (
+              &start_pos=string.scan("&myline","|",0)
+              &start_pos=&start_pos+1
+              &end_pos=string.scan("&myline","(",0)
+              &curr_func=string.mid("&myline",&start_pos,&end_pos-&start_pos)
+            )
+          )
+        )
+      )
+
+      ; MS_Code\MS_System\RTOS\source\src_osa
+      global &_global_symbol_attr &_global_symbol_prototype &_global_symbol_source
+      do "&curr_script_dir\_trace32_symbol_info.cmm" "&export_dir\get_entry_y.info.txt" "&prev_func"
+      if ("&_global_symbol_source"==""||string.scan("&_global_symbol_source","MS_System\RTOS\",0)!=-1)
+      (
+        &caller_SCI_xxx="&curr_func"
+        if (string.scan("&curr_func","SCI_",0)==0)
+        (
+          goto CMM_SCI_xxx_LOOP
+        )
+      )
+    )
+  )
+  if ((("&prev_func"=="TXAS_SystemAssert")||("&prev_func"=="osa_fatal_error_handler_info"))&&(string.scan("&curr_func","osa_",0)==0))
+  (
+    ; osa_xxx call TXAS_SystemAssert or osa_fatal_error_handler_info
+CMM_osa_xxx_LOOP:
+    &has_xxx=&has_xxx+1
+    &has_osa_xxx=&has_xxx
+    read #1 %line &myline
+    if (!file.eof(1))
+    (
+      &prev_func="&curr_func"
+      &curr_func=""
+      if (string.scan("&myline","(",0)!=-1&&string.scan("&myline","|",0)!=-1)
+      (
+        &start_pos=string.scan("&myline","|",0)
+        &start_pos=&start_pos+1
+        &end_pos=string.scan("&myline","(",0)
+        &curr_func=string.mid("&myline",&start_pos,&end_pos-&start_pos)
+        if (string.scan("&myline","(inline)",0)!=-1)
+        (
+          read #1 %line &myline
+          if (!file.eof(1))
+          (
+            &prev_func="&curr_func"
+            &curr_func=""
+            if (string.scan("&myline","(",0)!=-1&&string.scan("&myline","|",0)!=-1)
+            (
+              &start_pos=string.scan("&myline","|",0)
+              &start_pos=&start_pos+1
+              &end_pos=string.scan("&myline","(",0)
+              &curr_func=string.mid("&myline",&start_pos,&end_pos-&start_pos)
+            )
+          )
+        )
+      )
+
+      ; MS_Code\MS_System\RTOS\source\src_osa
+      global &_global_symbol_attr &_global_symbol_prototype &_global_symbol_source
+      do "&curr_script_dir\_trace32_symbol_info.cmm" "&export_dir\get_entry_y.info.txt" "&prev_func"
+      if ("&_global_symbol_source"==""||string.scan("&_global_symbol_source","PS\sdi\osa\",0)!=-1)
+      (
+        &caller_osa_xxx="&curr_func"
+        if (string.scan("&curr_func","osa_",0)==0)
+        (
+          goto CMM_osa_xxx_LOOP
+        )
+      )
+    )
+  )
+  if ((("&prev_func"=="TXAS_SystemAssert")||("&prev_func"=="osa_fatal_error_handler_info")||(string.scan("&prev_func","osa_",0)==0))&&(string.scan("&curr_func","sdi_",0)==0))
+  (
+    ; sdi_xxx call TXAS_SystemAssert or osa_fatal_error_handler_info
+CMM_sdi_xxx_LOOP:
+    &has_xxx=&has_xxx+1
+    &has_sdi_xxx=&has_xxx
+    read #1 %line &myline
+    if (!file.eof(1))
+    (
+      &prev_func="&curr_func"
+      &curr_func=""
+      if (string.scan("&myline","(",0)!=-1&&string.scan("&myline","|",0)!=-1)
+      (
+        &start_pos=string.scan("&myline","|",0)
+        &start_pos=&start_pos+1
+        &end_pos=string.scan("&myline","(",0)
+        &curr_func=string.mid("&myline",&start_pos,&end_pos-&start_pos)
+        if (string.scan("&myline","(inline)",0)!=-1)
+        (
+          read #1 %line &myline
+          if (!file.eof(1))
+          (
+            &prev_func="&curr_func"
+            &curr_func=""
+            if (string.scan("&myline","(",0)!=-1&&string.scan("&myline","|",0)!=-1)
+            (
+              &start_pos=string.scan("&myline","|",0)
+              &start_pos=&start_pos+1
+              &end_pos=string.scan("&myline","(",0)
+              &curr_func=string.mid("&myline",&start_pos,&end_pos-&start_pos)
+            )
+          )
+        )
+      )
+
+      ; MS_Code\MS_System\RTOS\source\src_osa
+      global &_global_symbol_attr &_global_symbol_prototype &_global_symbol_source
+      do "&curr_script_dir\_trace32_symbol_info.cmm" "&export_dir\get_entry_y.info.txt" "&prev_func"
+      if ("&_global_symbol_source"==""||string.scan("&_global_symbol_source","PS\sdi\",0)!=-1)
+      (
+        &caller_sdi_xxx="&curr_func"
+        if (string.scan("&curr_func","sdi_",0)==0)
+        (
+          goto CMM_sdi_xxx_LOOP
+        )
+      )
+    )
+  )
+  if (string.scan("&myline","osa_timer_routine_wraper(",0)!=-1)
+  (
+    &has_osa_timer_routine_wraper=1
+    if (string.scan("&prevline","(",0)!=-1&&string.scan("&prevline","|",0)!=-1)
+    (
+      &start_pos=string.scan("&prevline","|",0)
+      &start_pos=&start_pos+1
+      &end_pos=string.scan("&prevline","(",0)
+      &callee_osa_timer_routine_wraper=string.mid("&prevline",&start_pos,&end_pos-&start_pos)
+    )
+    if ("&_global_thread_timer_callback"=="")
+    (
+      &_global_thread_timer_callback="&callee_osa_timer_routine_wraper"
+    )
+  )
+  if ((string.scan("&myline","tx_thread_shell_entry(",0)!=-1)||(string.scan("&myline","ThreadEntry(",0)!=-1)||(string.scan("&myline","stack_process_extq_msg(",0)!=-1)||(string.scan("&myline","infra_process_extq_msg(",0)!=-1)||(string.scan("&myline","stack_multi_module_task(",0)!=-1)||(string.scan("&myline","end of frame",0)!=-1))
+  (
+    &has_entry=1
+    if (string.scan("&prevline","(",0)!=-1&&string.scan("&prevline","|",0)!=-1)
+    (
+      &start_pos=string.scan("&prevline","|",0)
+      &start_pos=&start_pos+1
+      &end_pos=string.scan("&prevline","(",0)
+      &callee_entry=string.mid("&prevline",&start_pos,&end_pos-&start_pos)
+    )
+    if ("&task_entry"=="")
+    (
+      &task_entry="&callee_entry"
+    )
+  )
+  &prevline="&myline"
+  read #1 %line &myline
+)
+close #1
+
+if (&frame_counter==0)
+(
+  if (string.scan("&task_entry","B::v.f",0)!=-1)
+  (
+    &task_entry=""
+  )
+)
+; only one function? check R14 to find it out.
+else if (&frame_counter==1)
+(
+  &_global_is_entry_from_return_address=1
+  &prev_caller_addr=register(r14)
+  if (v.value(&caller_core_num)>v.value("1"))
+  (
+    core.select &caller_core_index
+    &prev_caller_addr=register(r14)
+  )
+  &prev_caller_addr=&prev_caller_addr-4
+  if (((&prev_caller_addr)&0x1)!=0)
+  (
+    &prev_caller_addr=&prev_caller_addr-1
+  )
+  &prev_caller_addr=v.value(&prev_caller_addr)
+  do "&curr_script_dir\_trace32_data_list.cmm" "&prev_caller_addr" "&export_dir\get_entry_d.l_prev_caller_addr.txt" "&caller_core_index" "&caller_core_num"
+  
+  local &code_line &first_code_line
+  &first_code_line=""
+  open #2 "&export_dir\get_entry_d.l_prev_caller_addr.txt" /read
+  read #2 %line &code_line
+  while !file.eof(2)
+  (
+    if (string.scan("&code_line","ST:",0)!=-1)
+    (
+      &first_code_line="&code_line"
+      goto CMM_ANALYZE_DATA_LIST_END
+    )
+    &prevline="&code_line"
+    read #2 %line &code_line
+  )
+  
+CMM_ANALYZE_DATA_LIST_END:
+  close #2
+  if (string.scan("&first_code_line"," bl ",0)!=-1||string.scan("&first_code_line"," blx ",0)!=-1)
+  (
+    &pos=0
+    if (string.scan("&first_code_line"," bl ",0)!=-1)
+    (
+      &pos=string.scan("&first_code_line"," bl ",0)
+      &pos=&pos+4
+    )
+    else
+    (
+      &pos=string.scan("&first_code_line"," blx ",0)
+      &pos=&pos+5
+    )
+    &end_pos=string.length("&first_code_line")
+    while (&pos<&end_pos)
+    (
+      if (string.char("&first_code_line", &pos)!=0x20)
+      (
+        goto CMM_ANALYZE_FIRST_CODE_LINE_END
+      )
+      &pos=&pos+1
+    )
+    
+CMM_ANALYZE_FIRST_CODE_LINE_END:
+    &curr_proc_addr=string.mid("&first_code_line", v.value(&pos), 0xa)
+    global &_global_function_name
+    do "&curr_script_dir\_trace32_symbol_function.cmm" "&curr_proc_addr"
+    if ("&_global_function_name"!="")
+    (
+      &doing_line="&_global_function_name"
+    )
+    else
+    (
+      &doing_line="&curr_proc_addr"
+    )
+    
+    do "&curr_script_dir\_trace32_symbol_function.cmm" "&prev_caller_addr"
+    if ("&_global_function_name"!="")
+    (
+      &task_entry="&_global_function_name"
+    )
+    else
+    (
+      &task_entry="&prev_caller_addr"
+    )
+  )
+)
+else
+(
+  &has_tmp_xxx=0
+  if ("&caller_SCI_xxx"!=""&&(&has_tmp_xxx<&has_SCI_xxx))
+  (
+    ; caller -> SCI_xxx -> TXAS_SystemAssert or osa_fatal_error_handler_info
+    &doing_line="&caller_SCI_xxx"
+    &has_tmp_xxx=&has_SCI_xxx
+  )
+  if ("&caller_osa_xxx"!=""&&(&has_tmp_xxx<&has_osa_xxx))
+  (
+    ; caller -> osa_xxx -> TXAS_SystemAssert or osa_fatal_error_handler_info
+    &doing_line="&caller_osa_xxx"
+    &has_tmp_xxx=&has_osa_xxx
+  )
+  if ("&caller_sdi_xxx"!=""&&(&has_tmp_xxx<&has_sdi_xxx))
+  (
+    ; caller -> sdi_xxx -> TXAS_SystemAssert or osa_fatal_error_handler_info
+    &doing_line="&caller_sdi_xxx"
+    &has_tmp_xxx=&has_sdi_xxx
+  )
+  if (&has_tmp_xxx>0)
+  (
+  )
+  else if (&has_osa_fatal_error_handler_info==1)
+  (
+    ; caller -> osa_fatal_error_handler_info
+    &doing_line="&caller_osa_fatal_error_handler_info"
+  )
+  else if (&has_TXAS_SystemAssert==1)
+  (
+    ; caller -> TXAS_SystemAssert
+    &doing_line="&caller_TXAS_SystemAssert"
+  )
+)
+
+; record 
+&_global_osa_tx_thread_doing="&doing_line"
+&_global_osa_tx_thread_frame_counter=&frame_counter
+&_global_osa_tx_thread_entry="&task_entry"
+
+CMM_END:
+
+enddo

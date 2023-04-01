@@ -1,0 +1,212 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  ARM Component                                                                                         ;;
+;;                                                                                                        ;;
+;;    Common: recover stack                                                                               ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Create logging output window
+area.create recover_stack_win 200. 500.
+area.select recover_stack_win
+area.view recover_stack_win
+
+;PMACRO.list
+local &err
+&err=0
+
+&curr_script_dir=os.ppd()
+
+if !symbol.exist(s_exception_type)||!symbol.exist(cur_mode_reg)
+(
+  &err=1
+  print "Error: `s_exception_type' or `cur_mode_reg' does not exist. EXIT script"
+  goto CMM_END
+)
+
+local &curr_r14
+local &curr_cpsr
+local &curr_spsr
+local &curr_cpsr_mode
+local &curr_spsr_mode
+local &curr_exception_type
+local &cur_mode_reg_address
+local &svc_mode_reg_address
+&cur_mode_reg_address=v.value(&cur_mode_reg)
+&svc_mode_reg_address=v.value(&svc_mode_reg)
+R.S CPSR V.Value(*((uint32*)(&cur_mode_reg_address+68)))
+R.S r0 V.Value(*((uint32*)(&cur_mode_reg_address)))
+R.S r1 V.Value(*((uint32*)(&cur_mode_reg_address+4)))
+R.S r2 V.Value(*((uint32*)(&cur_mode_reg_address+8)))
+R.S r3 V.Value(*((uint32*)(&cur_mode_reg_address+12)))
+R.S r4 V.Value(*((uint32*)(&cur_mode_reg_address+16)))
+R.S r5 V.Value(*((uint32*)(&cur_mode_reg_address+20)))
+R.S r6 V.Value(*((uint32*)(&cur_mode_reg_address+24)))
+R.S r7 V.Value(*((uint32*)(&cur_mode_reg_address+28)))
+R.S r8 V.Value(*((uint32*)(&cur_mode_reg_address+32)))
+R.S r9 V.Value(*((uint32*)(&cur_mode_reg_address+36)))
+R.S r10 V.Value(*((uint32*)(&cur_mode_reg_address+40)))
+R.S r11 V.Value(*((uint32*)(&cur_mode_reg_address+44)))
+R.S r12 V.Value(*((uint32*)(&cur_mode_reg_address+48)))
+R.S r13 V.Value(*((uint32*)(&cur_mode_reg_address+52)))
+R.S r14 V.Value(*((uint32*)(&cur_mode_reg_address+56)))
+R.S pc V.Value(*((uint32*)(&cur_mode_reg_address+60)))
+R.S SPSR V.Value(*((uint32*)(&cur_mode_reg_address+64)))
+
+&curr_r14=V.Value(*((uint32*)(&cur_mode_reg_address+56)))
+&curr_cpsr=V.Value(*((uint32*)(&cur_mode_reg_address+68)))
+&curr_spsr=V.Value(*((uint32*)(&cur_mode_reg_address+64)))
+&curr_cpsr_mode=(&curr_cpsr&0x1f)
+&curr_spsr_mode=(&curr_spsr&0x1f)
+&curr_exception_type=v.value(s_exception_type)
+
+local &abort_DFSR_reg
+local &abort_FAR_reg
+if (symbol.exist(abort_DFSR_reg)&&v.value("sizeof(abort_DFSR_reg)")!=v.value("0"))
+(
+  &abort_DFSR_reg=V.Value(abort_DFSR_reg)
+  &abort_FAR_reg=V.Value(abort_FAR_reg)
+)
+else
+(
+  &abort_DFSR_reg=0
+  &abort_FAR_reg=0
+)
+
+global &_global_psr_i &_global_psr_f &_global_psr_t &_global_psr_mode &_global_psr_mode_name
+do "&curr_script_dir\_arm_analyze_xpsr.cmm" "&curr_cpsr"
+print "the current mode is &curr_cpsr: &_global_psr_mode_name mode {i:&_global_psr_i,f:&_global_psr_f,t:&_global_psr_t}."
+do "&curr_script_dir\_arm_analyze_xpsr.cmm" "&curr_spsr"
+print "the previous mode is &curr_spsr: &_global_psr_mode_name mode {i:&_global_psr_i,f:&_global_psr_f,t:&_global_psr_t}."
+
+print "curr_cpsr is &curr_cpsr"
+print "curr_spsr is &curr_spsr"
+print "curr_cpsr_mode is &curr_cpsr_mode"
+print "curr_spsr_mode is &curr_spsr_mode"
+print "curr_exception_type is &curr_exception_type"
+
+if &curr_cpsr_mode==0x13
+(
+  print "the curr mode is svc..."
+)
+else if &curr_cpsr_mode==0x12
+(
+  ; add by pizer
+  print "the current mode is irq mode."
+  R.S R13_SVC V.Value(*((uint32*)(&svc_mode_reg_address)))
+  R.S R14_SVC V.Value(*((uint32*)(&svc_mode_reg_address+4)))
+  R.S SPSR_SVC V.Value(*((uint32*)(&svc_mode_reg_address+8)))
+)
+else if (&curr_cpsr_mode==0x17)&&(&curr_exception_type==0x4)
+(
+  ;data abort
+  print "the curr mode is data abort..."
+  if (v.value(&(abort_DFSR_reg)&0xF)==v.value("0x1"))&&(v.value(&(abort_DFSR_reg)&0x400)==v.value("0x0"))
+  (
+    ; 0xxxxxx0001b
+    print "DFSR:0x" &(abort_DFSR_reg) ": Alignment fault!"
+  )
+  else if (v.value(&(abort_DFSR_reg)&0xF)==v.value("0x0"))&&(v.value(&(abort_DFSR_reg)&0x400)==v.value("0x0"))
+  (
+    ; 0xxxxxx0001b
+    print "DFSR:0x" &(abort_DFSR_reg) ": Background fault!"
+  )
+  else if (v.value(&(abort_DFSR_reg)&0xF)==v.value("0xD"))&&(v.value(&(abort_DFSR_reg)&0x400)==v.value("0x0"))
+  (
+    ; 0xxxxxx1101b
+    print "DFSR:0x" &(abort_DFSR_reg) ": Permission fault!"
+  )
+  else if (v.value(&(abort_DFSR_reg)&0xF)==v.value("0x6"))&&(v.value(&(abort_DFSR_reg)&0x400)==v.value("0x400"))
+  (
+    ; 1xxxxxx0110b
+    print "DFSR:0x" &(abort_DFSR_reg) ": Asynchronous external abort!"
+  )
+  
+  if &curr_spsr_mode==0x13
+  (
+    &reg_lr=V.Value(*((uint32*)(&svc_mode_reg_address+4)))
+    &reg_pc=(&curr_r14-8)
+    print "back to svc mode (lr: &reg_lr <- pc: &reg_pc)" 
+    R.S CPSR &curr_spsr
+    R.S PC (&curr_r14-8)
+    R.S r13 V.Value(*((uint32*)(&svc_mode_reg_address)))
+    R.S r14 V.Value(*((uint32*)(&svc_mode_reg_address+4)))
+  )
+  else if v.value(&curr_spsr_mode)==v.value("0x12")
+  (
+    ; add by pizer
+    ;print "back to irq mode!"
+    ;R.S CPSR &current_spsr
+    ;R.S PC (&curr_r14-8)
+    ;R.S r13 V.Value(*((uint32*)(&irq_mode_reg_address)))
+    ;R.S r14 V.Value(*((uint32*)(&irq_mode_reg_address+4)))
+  )
+)
+
+else if (&curr_cpsr_mode==0x17)&&(&curr_exception_type==0x3)
+(
+  ;prefetch abort
+  print "the curr mode is prefetch abort..."
+  if &curr_spsr_mode==0x13
+  (
+    &reg_lr=V.Value(*((uint32*)(&svc_mode_reg_address+4)))
+    &reg_pc=(&curr_r14-4)
+    print "back to svc mode (lr: &reg_lr <- pc: &reg_pc)" 
+    R.S CPSR &curr_spsr
+    R.S PC (&curr_r14-4)
+    R.S r13 V.Value(*((uint32*)(&svc_mode_reg_address)))
+    R.S r14 V.Value(*((uint32*)(&svc_mode_reg_address+4)))
+  )
+)
+
+else if (&curr_cpsr_mode==0x17)&&(&curr_spsr_mode==0x17)
+(
+  print "abort after abort..."
+)
+else if &curr_cpsr_mode==0x1b
+(
+  ;undef instr
+  print "the curr mode is undef instr..."
+  if &curr_spsr_mode==0x13
+  (
+    R.S CPSR &curr_spsr
+    R.S PC &curr_r14
+    R.S r13 V.Value(*((uint32*)(&svc_mode_reg_address)))
+    R.S r14 V.Value(*((uint32*)(&svc_mode_reg_address+4)))
+  )
+)
+
+print "recover completely..."
+
+CMM_END:
+
+; Close the logging output window
+;wait 5s
+;if (&err==0)
+;(
+;  area.close recover_stack_win
+;  do "&curr_script_dir\_trace32_area_delete.cmm" "recover_stack_win"
+;)
+
+enddo

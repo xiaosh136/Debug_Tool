@@ -1,0 +1,202 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  TX Component                                                                                          ;;
+;;                                                                                                        ;;
+;;    Mutex: Save the mutexes info into the HOST file.                                                    ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; Create logging output window
+area.create logging_win 200. 500.
+area.select logging_win
+area.view logging_win
+
+;PMACRO.list
+local &err
+&err=0
+
+; Enter the export directory if null
+global &_global_export_dir
+&curr_script_dir=os.ppd()
+do "&curr_script_dir\_setting_input_export_dir_if_null.cmm"
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+
+; Makeup output file path
+local &output_file_path
+local &output_file_name
+local &core_name
+if symbol.exist(LOG_magicHeader)
+(
+  &core_name=data.string(d:v.value(LOG_magicHeader.coreName))
+  &output_file_name="tx_mutexinfo_&(core_name).txt"
+)
+else
+(
+  &output_file_name="tx_mutexinfo.txt"
+)
+&output_file_path="&(export_dir)/&output_file_name"
+
+print "Export to directory : &(export_dir)"
+print "Start time : " clock.date() "  " clock.time() "  ..."
+print ""
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Start ...                                                                                             ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &head_symbol
+&head_symbol="_tx_mutex_created_ptr"
+if !(symbol.exist(&head_symbol))
+(
+  &err=1
+  print "Error: `_tx_mutex_created_ptr' does not exist. EXIT script"
+  goto CMM_END
+)
+
+; Create output file
+area.create output_file_win 200. 500.
+area.open output_file_win "&output_file_path"
+area.select output_file_win
+
+local &head_symbol_val &ptr
+local &created_cnt
+&created_cnt=0
+
+print "===============Mutex Info==============="
+print "                 Suspended  Ownership                "
+print "    No,    Addr,   Count  ,  Count  ,  Prio, Name,    Owner"
+
+&ptr=v.value((TX_MUTEX*)&head_symbol)
+&head_symbol_val=v.value((TX_MUTEX*)&head_symbol)
+
+CMM_LOOP:
+
+&mutex_id=v.value(((TX_MUTEX*)&ptr)->tx_mutex_id)
+if &mutex_id!=0x4D555445
+(
+  ; The event list has been destroied
+  print "Current mutex list has been destroied !!!"
+  goto CMM_FILE_CLOSE
+)
+
+&mutex_owner=v.value(((TX_MUTEX*)&ptr)->tx_mutex_owner)
+&mutex_string_addr=v.value(((TX_MUTEX*)&ptr)->tx_mutex_name)
+&mutex_suspended_count=v.value(((TX_MUTEX*)&ptr)->tx_mutex_suspended_count)
+&mutex_ownership_count=v.value(((TX_MUTEX*)&ptr)->tx_mutex_ownership_count)
+&mutex_priority=v.value(((TX_MUTEX*)&ptr)->tx_mutex_original_priority)
+if &mutex_owner==0
+(
+  print "  " format.decimal(4, v.value(&created_cnt+1)) "  " &ptr "  " format.decimal(4,v.value(&mutex_suspended_count)) ", " format.decimal(8,v.value(&mutex_ownership_count)) ", " format.decimal(8,v.value(&mutex_priority)) ",  " data.string(d:&mutex_string_addr) ",   [No Owner]  " 
+)
+else
+(
+  &mutex_owner_string_addr=v.value(((TX_MUTEX*)&ptr)->tx_mutex_owner->tx_thread_name)
+  print "  " format.decimal(4, v.value(&created_cnt+1)) "  " &ptr "  " format.decimal(4,v.value(&mutex_suspended_count)) ", " format.decimal(8,v.value(&mutex_ownership_count)) ", " format.decimal(8,v.value(&mutex_priority)) ",  " data.string(d:&mutex_string_addr) ", " data.string(d:&mutex_owner_string_addr)
+)
+
+&mutex_suspension_count=v.value(((TX_MUTEX*)&ptr)->tx_mutex_suspended_count)
+if &mutex_suspension_count>0
+(
+  &mutex_suspension_list=v.value(((TX_MUTEX*)&ptr)->tx_mutex_suspension_list)
+  if &mutex_suspension_list!=0
+  (
+    ; Print all the tasks info suspended the list
+    &suspension_list=&mutex_suspension_list
+CMM_LOOP_2:
+    &mutex_string_addr=v.value(((TX_THREAD*)&suspension_list)->tx_thread_name)
+    print "        Suspend Task :  " data.string(d:&mutex_string_addr)
+    
+    local &suspension_list_tmp
+    if (v.value("sizeof(TX_THREAD)")==v.value("188"))
+    (
+      &suspension_list_tmp=v.value(((TX_THREAD*)&suspension_list)->tx_suspended_next)
+    )
+    else
+    (
+      &suspension_list_tmp=v.value(((TX_THREAD*)&suspension_list)->tx_thread_suspended_next)
+    )
+    &suspension_list=&suspension_list_tmp
+    if &suspension_list==&mutex_suspension_list
+    (
+      goto EXIT_LOOP_2
+    )
+    else
+    (
+      goto CMM_LOOP_2
+    )
+  )
+)
+EXIT_LOOP_2:
+
+&ptr_tmp=v.value(((TX_MUTEX*)&ptr)->tx_mutex_created_next)
+&ptr=&ptr_tmp
+&created_cnt=&created_cnt+1
+
+if (&ptr!=&head_symbol_val)&&(&ptr!=0)
+  goto CMM_LOOP
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Counter Info                                                                                          ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+print ""
+print "===============Counter Info==============="
+&created_cnt=format.decimal(8,&created_cnt)
+print " Created counter: &created_cnt"
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  End                                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_FILE_CLOSE:
+print ""
+area.close output_file_win
+area.clear output_file_win
+
+type "&output_file_path"
+
+CMM_END:
+area.select logging_win
+
+print ""
+print "End time : " clock.date() "  " clock.time() "  "
+
+; Close the logging output window
+; wait 1s
+if (&err==0)
+(
+  area.close logging_win
+  do "&curr_script_dir\_trace32_area_delete.cmm" "logging_win"
+)
+
+enddo
+

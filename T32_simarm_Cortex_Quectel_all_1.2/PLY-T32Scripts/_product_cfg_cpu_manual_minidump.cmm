@@ -1,0 +1,170 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Product Config Component                                                                              ;;
+;;                                                                                                        ;;
+;;    The product config (memory layout) for manual input                                                 ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;PMACRO.list
+local &err
+&err=0
+
+global &_global_cpu_num
+print "Please config cpu [CortexR5]: "
+enter &sys_cpu
+if ("&sys_cpu"=="")
+(
+  &sys_cpu="CortexR5"
+)
+
+;SYSTEM.CPU CORTEXA7
+SYSTEM.CPU &sys_cpu
+
+
+print "Please config core nubmer [1]: "
+enter &cpu_core_number
+if ("&cpu_core_number"=="")
+(
+  &cpu_core_number=1
+)
+if (v.value("&cpu_core_number")>1)
+(
+  print "You set core number: &cpu_core_number"
+  SYStem.CONFIG.CoreNumber &cpu_core_number.
+  CORE.ASSIGN 1. 2.
+  &_global_cpu_num=&cpu_core_number
+)
+SYSTEM.UP
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Select the working directory                                                                          ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+GLOBAL &T32SimuPath
+GLOBAL &_global_export_dir
+global &_global_working_dir
+
+LOCAL &T32_ROOT_DIR
+&T32_ROOT_DIR=OS.PSD()
+&T32SimuPath="&T32_ROOT_DIR\demo\arm\kernel\threadx"
+&curr_script_dir=OS.PPD()
+
+print "Please input the working directory [&curr_script_dir]: "
+enter &_global_working_dir
+if ("&_global_working_dir"=="")
+(
+  &_global_working_dir="&curr_script_dir"
+)
+&_global_export_dir="&_global_working_dir"
+title "TRACE32 Simulator [&_global_working_dir]"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Select the AXF file                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+print "Select AXF file: "
+DIALOG.FILE "&_global_working_dir\*.axf"
+ENTRY &axf_file_path
+if ("&axf_file_path"=="")
+(
+  &err=1
+  goto CMM_END
+)
+
+print "Load &axf_file_path ..."
+global &_global_axf_file_path
+&_global_axf_file_path="&axf_file_path"
+d.load "&axf_file_path"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Select the modem bin file                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+print "Select modem bin file: "
+DIALOG.FILE "&_global_working_dir\*.bin"
+ENTRY &modem_bin_file_path
+if ("&modem_bin_file_path"=="")
+(
+  &err=1
+  goto CMM_END
+)
+
+&EXEC_KERNEL_IMAGE0_Base=v.value(&Image$$EXEC_KERNEL_IMAGE0$$Base)
+&MEM_INFO_AREA_Base=&EXEC_KERNEL_IMAGE0_Base-0x600
+
+print "Load &modem_bin_file_path ..."
+d.load.binary "&modem_bin_file_path" &MEM_INFO_AREA_Base /noclear
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Select the minidump unpack bin file                                                                                ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+print "Please input the minidump unpack directory: "
+enter &_memory_bin_working_dir
+if ("&_memory_bin_working_dir"=="")
+(
+  &_memory_bin_working_dir="&_global_working_dir"
+)
+
+
+local &bin_file &patten
+&patten="*.bin"
+
+&bin_file=OS.FIRSTFILE("&_memory_bin_working_dir\&patten")
+
+while "&bin_file"!=""
+(
+
+	&begin_addr = string.SPLIT("&bin_file", "_0x", 1);
+
+	&begin_addr_string = "0x&begin_addr"
+	&begin_addr  = v.value(&begin_addr_string)
+
+
+	d.load.binary "&_memory_bin_working_dir\&bin_file" &begin_addr /noclear
+        &bin_file=OS.NEXTFILE()
+)
+
+; Recover stack
+if ("&sys_cpu"=="CortexR5")
+(
+do "&curr_script_dir\_arm_recover_stack.cmm"
+)
+else
+(
+do "&curr_script_dir\_arm_recover_v4_stack.cmm"
+)
+
+
+CMM_END:
+
+if (&err!=0)
+(
+  enddo false()
+)
+else
+(
+  enddo true()
+)

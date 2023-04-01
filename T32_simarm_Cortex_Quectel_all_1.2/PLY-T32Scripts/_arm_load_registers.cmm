@@ -1,0 +1,516 @@
+
+local &caller_core_id &caller_core_number
+entry &caller_core_id &caller_core_number
+&caller_core_id=&caller_core_id
+&caller_core_number=&caller_core_number
+
+&curr_script_dir=os.ppd()
+&export_dir="&_global_export_dir"
+
+; Create logging output window
+area.create load_registers_win 200. 500.
+area.select load_registers_win
+area.view load_registers_win
+
+global &_global_export_dir
+global &_global_cpu_num
+local &input_core_number
+if ("&caller_core_number"==""&&"&_global_cpu_num"=="")
+(
+  print "Please core number [1]: "
+  enter &input_core_number
+  if ("&input_core_number"=="")
+  (
+    &input_core_number=1
+  )
+)
+else if ("&caller_core_number"=="")
+(
+  &input_core_number=format.decimal(0, &_global_cpu_num)
+  &input_core_number="&input_core_number"
+  print "Please core number [&input_core_number]: "
+  enter &input_core_number
+  if ("&input_core_number"=="")
+  (
+    &input_core_number=format.decimal(0, &_global_cpu_num)
+  )
+)
+else
+(
+  &input_core_number=&caller_core_number
+)
+local &input_core_id
+&input_core_id=0
+if (v.value("&input_core_number")>1)
+(
+  if ("&caller_core_id"=="")
+  (
+    print "Please core id [0]: "
+    enter &input_core_id
+  )
+  else
+  (
+    &input_core_id=&caller_core_id
+  )
+)
+if ("&input_core_id"=="")
+(
+  &input_core_id="0"
+)
+else
+(
+  &input_core_id="&input_core_id"
+)
+
+area.close load_registers_win
+do "&curr_script_dir\_trace32_area_delete.cmm" "load_registers_win"
+
+local &registersListValue
+&registersListValue=""
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Dialog View                                                                                           ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+DIALOG.view
+(
+  titleText: HEADER "Load Registers"
+  
+  ; <x> <y> <w> <h>
+  POS 1. 0. 40.
+  CommentText: DYNTEXT ""
+  
+  POS 1. 1. 10.
+  R13Text: TEXT "R13:"
+  
+  POS 1. 2. 10.
+  R14Text: TEXT "R14:"
+  
+  POS 1. 3. 10.
+  R15Text: TEXT "R15:"
+  
+  POS 1. 4. 
+  RegistersListText: TEXT "Registers list:"
+  
+  POS 11. 1. 10.
+  R13Edit: EDIT "" ""
+  
+  POS 11. 2. 10.
+  R14Edit: EDIT "" ""
+  
+  POS 11. 3. 10.
+  R15Edit: EDIT "" ""
+  
+  POS 1. 5. 50. 8
+  RegistersList: MEDIT "" ""
+  (
+  )
+  
+  POS 46. 4. 5. 1.
+  OkBtn: BUTTON "Load" 
+  (
+    gosub CMM_SUB_UPD
+  )
+  
+  CLOSE "GOTO cancel"
+)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Initialize                                                                                             ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+  ; switch context
+  gosub CMM_SUB_INIT_SWITCH_CONTEXT
+  
+  if (v.value("&input_core_number")>1)
+  (
+    dialog.set CommentText "You're selecting the &input_core_id core of &input_core_number"
+  )
+  dialog.set RegistersList "&registersListValue"
+  dialog.disable R13Edit
+  dialog.disable R14Edit
+  dialog.disable R15Edit
+  
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  STOP command halts script execution                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;STOP command halts script execution 
+  STOP
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  continue script                                                                                       ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+  ; switch context
+  gosub CMM_SUB_DEINIT_SWITCH_CONTEXT
+  
+  DIALOG.END
+ENDDO
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  goto cancel - here                                                                                    ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+cancel:
+
+  ; switch context
+  gosub CMM_SUB_DEINIT_SWITCH_CONTEXT
+  
+  DIALOG.END
+ENDDO
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Sub of init switch context                                                                            ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_SUB_INIT_SWITCH_CONTEXT:
+  RETURN
+  
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Sub of deinit switch context                                                                          ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_SUB_DEINIT_SWITCH_CONTEXT:
+  RETURN
+  
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Sub of update                                                                                         ;;
+;;                                                                                                        ;;
+;; N _  R0   60000053  R8   98079308  ^S+ ^Stack_+                                                        ;;      
+;; Z _  R1          0  R9          0                                                                      ;;
+;; C _  R2          0  R10         0                                                                      ;;
+;; V _  R3   60000053  R11      0100                                                                      ;;
+;; Q _  R4   9867D7AC  R12         0                                                                      ;;
+;;      R5   98079308  R13  97FDD238                                                                      ;;
+;; 0 _  R6       0100  R14  9614D86B                                                                      ;;
+;; 1 _  R7          5  PC   96C61DB4                                                                      ;;
+;; 2 _  SPSR 20000053  CPSR       D3                                                                      ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_SUB_UPD:
+  &registersListValue=DIALOG.STRing(RegistersList)
+  dialog.set R13Edit ""
+  dialog.set R14Edit ""
+  dialog.set R15Edit ""
+  if (string.scan("&registersListValue"," CPSR ",0)!=-1)
+  (
+    &pos=string.scan("&registersListValue"," CPSR ",0)
+    &pos=&pos+string.length(" CPSR ")
+    do "&curr_script_dir\_str_get_value.cmm" "&registersListValue" "&pos"
+    entry &regVal
+    &regVal=v.value("&regVal")
+    if (v.value("&input_core_number")>1)
+    (
+      R.S CPSR &regVal /CORE &input_core_id.
+    )
+    else
+    (
+      R.S CPSR &regVal
+    )
+  )
+  if (string.scan("&registersListValue"," SPSR ",0)!=-1)
+  (
+    &pos=string.scan("&registersListValue"," SPSR ",0)
+    &pos=&pos+string.length(" SPSR ")
+    do "&curr_script_dir\_str_get_value.cmm" "&registersListValue" "&pos"
+    entry &regVal
+    &regVal=v.value("&regVal")
+    if (v.value("&input_core_number")>1)
+    (
+      R.S SPSR &regVal /CORE &input_core_id.
+    )
+    else
+    (
+      R.S SPSR &regVal
+    )
+  )
+  if (string.scan("&registersListValue"," SPSR=",0)!=-1)
+  (
+    &pos=string.scan("&registersListValue"," SPSR=",0)
+    &pos=&pos+string.length(" SPSR=")
+    do "&curr_script_dir\_str_get_value.cmm" "&registersListValue" "&pos"
+    entry &regVal
+    &regVal=v.value("&regVal")
+    if (v.value("&input_core_number")>1)
+    (
+      R.S SPSR &regVal /CORE &input_core_id.
+    )
+    else
+    (
+      R.S SPSR &regVal
+    )
+  )
+  if (string.scan("&registersListValue"," PC ",0)!=-1)
+  (
+    &pos=string.scan("&registersListValue"," PC ",0)
+    &pos=&pos+string.length(" PC ")
+    do "&curr_script_dir\_str_get_value.cmm" "&registersListValue" "&pos"
+    entry &regVal
+    &regVal=v.value("&regVal")
+    if (v.value("&input_core_number")>1)
+    (
+      R.S PC &regVal /CORE &input_core_id.
+    )
+    else
+    (
+      R.S PC &regVal
+    )
+    dialog.set R15Edit "&regVal"
+  )
+  if (string.scan("&registersListValue"," R14 ",0)!=-1)
+  (
+    &pos=string.scan("&registersListValue"," R14 ",0)
+    &pos=&pos+string.length(" R14 ")
+    do "&curr_script_dir\_str_get_value.cmm" "&registersListValue" "&pos"
+    entry &regVal
+    &regVal=v.value("&regVal")
+    if (v.value("&input_core_number")>1)
+    (
+      R.S R14 &regVal /CORE &input_core_id.
+    )
+    else
+    (
+      R.S R14 &regVal
+    )
+    dialog.set R14Edit "&regVal"
+  )
+  if (string.scan("&registersListValue"," R13 ",0)!=-1)
+  (
+    &pos=string.scan("&registersListValue"," R13 ",0)
+    &pos=&pos+string.length(" R13 ")
+    do "&curr_script_dir\_str_get_value.cmm" "&registersListValue" "&pos"
+    entry &regVal
+    &regVal=v.value("&regVal")
+    if (v.value("&input_core_number")>1)
+    (
+      R.S R13 &regVal /CORE &input_core_id.
+    )
+    else
+    (
+      R.S R13 &regVal
+    )
+    dialog.set R13Edit "&regVal"
+  )
+  if (string.scan("&registersListValue"," R12 ",0)!=-1)
+  (
+    &pos=string.scan("&registersListValue"," R12 ",0)
+    &pos=&pos+string.length(" R12 ")
+    do "&curr_script_dir\_str_get_value.cmm" "&registersListValue" "&pos"
+    entry &regVal
+    &regVal=v.value("&regVal")
+    if (v.value("&input_core_number")>1)
+    (
+      R.S R12 &regVal /CORE &input_core_id.
+    )
+    else
+    (
+      R.S R12 &regVal
+    )
+  )
+  if (string.scan("&registersListValue"," R11 ",0)!=-1)
+  (
+    &pos=string.scan("&registersListValue"," R11 ",0)
+    &pos=&pos+string.length(" R11 ")
+    do "&curr_script_dir\_str_get_value.cmm" "&registersListValue" "&pos"
+    entry &regVal
+    &regVal=v.value("&regVal")
+    if (v.value("&input_core_number")>1)
+    (
+      R.S R11 &regVal /CORE &input_core_id.
+    )
+    else
+    (
+      R.S R11 &regVal
+    )
+  )
+  if (string.scan("&registersListValue"," R10 ",0)!=-1)
+  (
+    &pos=string.scan("&registersListValue"," R10 ",0)
+    &pos=&pos+string.length(" R10 ")
+    do "&curr_script_dir\_str_get_value.cmm" "&registersListValue" "&pos"
+    entry &regVal
+    &regVal=v.value("&regVal")
+    if (v.value("&input_core_number")>1)
+    (
+      R.S R10 &regVal /CORE &input_core_id.
+    )
+    else
+    (
+      R.S R10 &regVal
+    )
+  )
+  if (string.scan("&registersListValue"," R9 ",0)!=-1)
+  (
+    &pos=string.scan("&registersListValue"," R9 ",0)
+    &pos=&pos+string.length(" R9 ")
+    do "&curr_script_dir\_str_get_value.cmm" "&registersListValue" "&pos"
+    entry &regVal
+    &regVal=v.value("&regVal")
+    if (v.value("&input_core_number")>1)
+    (
+      R.S R9 &regVal /CORE &input_core_id.
+    )
+    else
+    (
+      R.S R9 &regVal
+    )
+  )
+  if (string.scan("&registersListValue"," R8 ",0)!=-1)
+  (
+    &pos=string.scan("&registersListValue"," R8 ",0)
+    &pos=&pos+string.length(" R8 ")
+    do "&curr_script_dir\_str_get_value.cmm" "&registersListValue" "&pos"
+    entry &regVal
+    &regVal=v.value("&regVal")
+    if (v.value("&input_core_number")>1)
+    (
+      R.S R8 &regVal /CORE &input_core_id.
+    )
+    else
+    (
+      R.S R8 &regVal
+    )
+  )
+  if (string.scan("&registersListValue"," R7 ",0)!=-1)
+  (
+    &pos=string.scan("&registersListValue"," R7 ",0)
+    &pos=&pos+string.length(" R7 ")
+    do "&curr_script_dir\_str_get_value.cmm" "&registersListValue" "&pos"
+    entry &regVal
+    &regVal=v.value("&regVal")
+    if (v.value("&input_core_number")>1)
+    (
+      R.S R7 &regVal /CORE &input_core_id.
+    )
+    else
+    (
+      R.S R7 &regVal
+    )
+  )
+  if (string.scan("&registersListValue"," R6 ",0)!=-1)
+  (
+    &pos=string.scan("&registersListValue"," R6 ",0)
+    &pos=&pos+string.length(" R6 ")
+    do "&curr_script_dir\_str_get_value.cmm" "&registersListValue" "&pos"
+    entry &regVal
+    &regVal=v.value("&regVal")
+    if (v.value("&input_core_number")>1)
+    (
+      R.S R6 &regVal /CORE &input_core_id.
+    )
+    else
+    (
+      R.S R6 &regVal
+    )
+  )
+  if (string.scan("&registersListValue"," R5 ",0)!=-1)
+  (
+    &pos=string.scan("&registersListValue"," R5 ",0)
+    &pos=&pos+string.length(" R5 ")
+    do "&curr_script_dir\_str_get_value.cmm" "&registersListValue" "&pos"
+    entry &regVal
+    &regVal=v.value("&regVal")
+    if (v.value("&input_core_number")>1)
+    (
+      R.S R5 &regVal /CORE &input_core_id.
+    )
+    else
+    (
+      R.S R5 &regVal
+    )
+  )
+  if (string.scan("&registersListValue"," R4 ",0)!=-1)
+  (
+    &pos=string.scan("&registersListValue"," R4 ",0)
+    &pos=&pos+string.length(" R4 ")
+    do "&curr_script_dir\_str_get_value.cmm" "&registersListValue" "&pos"
+    entry &regVal
+    &regVal=v.value("&regVal")
+    if (v.value("&input_core_number")>1)
+    (
+      R.S R4 &regVal /CORE &input_core_id.
+    )
+    else
+    (
+      R.S R4 &regVal
+    )
+  )
+  if (string.scan("&registersListValue"," R3 ",0)!=-1)
+  (
+    &pos=string.scan("&registersListValue"," R3 ",0)
+    &pos=&pos+string.length(" R3 ")
+    do "&curr_script_dir\_str_get_value.cmm" "&registersListValue" "&pos"
+    entry &regVal
+    &regVal=v.value("&regVal")
+    if (v.value("&input_core_number")>1)
+    (
+      R.S R3 &regVal /CORE &input_core_id.
+    )
+    else
+    (
+      R.S R3 &regVal
+    )
+  )
+  if (string.scan("&registersListValue"," R2 ",0)!=-1)
+  (
+    &pos=string.scan("&registersListValue"," R2 ",0)
+    &pos=&pos+string.length(" R2 ")
+    do "&curr_script_dir\_str_get_value.cmm" "&registersListValue" "&pos"
+    entry &regVal
+    &regVal=v.value("&regVal")
+    if (v.value("&input_core_number")>1)
+    (
+      R.S R2 &regVal /CORE &input_core_id.
+    )
+    else
+    (
+      R.S R2 &regVal
+    )
+  )
+  if (string.scan("&registersListValue"," R1 ",0)!=-1)
+  (
+    &pos=string.scan("&registersListValue"," R1 ",0)
+    &pos=&pos+string.length(" R1 ")
+    do "&curr_script_dir\_str_get_value.cmm" "&registersListValue" "&pos"
+    entry &regVal
+    &regVal=v.value("&regVal")
+    if (v.value("&input_core_number")>1)
+    (
+      R.S R1 &regVal /CORE &input_core_id.
+    )
+    else
+    (
+      R.S R1 &regVal
+    )
+  )
+  if (string.scan("&registersListValue"," R0 ",0)!=-1)
+  (
+    &pos=string.scan("&registersListValue"," R0 ",0)
+    &pos=&pos+string.length(" R0 ")
+    do "&curr_script_dir\_str_get_value.cmm" "&registersListValue" "&pos"
+    entry &regVal
+    &regVal=v.value("&regVal")
+    if (v.value("&input_core_number")>1)
+    (
+      R.S R0 &regVal /CORE &input_core_id.
+    )
+    else
+    (
+      R.S R0 &regVal
+    )
+  )
+  RETURN
+
+CMM_SUB_UPD_END:
+  RETURN
+  
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  End                                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_END:
+
+ENDDO
+

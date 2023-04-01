@@ -1,0 +1,92 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Assert Component                                                                                      ;;
+;;                                                                                                        ;;
+;;    Assert: Analyze assert info                                                                             ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &caller_assert_win &assert_core_name &assert_core_num &caller_assert_info &assert_root_core_name &assert_root_core_index
+entry &caller_assert_win &assert_core_name &assert_core_num &caller_assert_info &assert_root_core_name &assert_root_core_index
+
+; remove \"\"
+&caller_assert_win=&caller_assert_win
+&caller_assert_info=&caller_assert_info
+&assert_core_name=&assert_core_name
+&assert_core_num=&assert_core_num
+&assert_root_core_name=&assert_root_core_name
+&assert_root_core_index=&assert_root_core_index
+
+&curr_script_dir=os.ppd()
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+
+; analyze assert info , case : "Internal Stack underflow"
+if (string.scan("&caller_assert_info","osa_mem_mgr_common.c",0)!=-1)&&(string.scan("&caller_assert_info","Internal Stack underflow",0)!=-1)
+(
+  area.select &caller_assert_win
+  
+  print "Assert Info: &caller_assert_info"
+  
+  print "[Analyze: Memory leak] ? No engough memory ! get the TOP of allocations ..."
+  
+  ; List TOP 10 of the allocations
+  do "&curr_script_dir\_osa_tx_list_mem_top_x.cmm" "0xa" "&caller_assert_win"
+  
+  ; print v.f
+  do "&curr_script_dir\_trace32_print_var_frame.cmm" "&export_dir\v.f.txt" "&assert_root_core_index" "&assert_core_num" "  "
+  
+  ; get thread entry
+  global &_global_osa_tx_thread_entry &_global_osa_tx_thread_doing &_global_osa_tx_thread_frame_counter &_global_is_entry_from_return_address
+  do "&curr_script_dir\_osa_tx_get_thread_entry.cmm" "&export_dir\v.f.txt" "&assert_root_core_index" "&assert_core_num"
+  if (&_global_is_entry_from_return_address==1)
+  (
+    &prev_caller_addr=register(r14)
+    print "  Find the entry by R14: &prev_caller_addr"
+  )
+  if ("&_global_osa_tx_thread_doing"!="")
+  (
+    global &_global_symbol_attr &_global_symbol_prototype &_global_symbol_source
+    do "&curr_script_dir\_trace32_symbol_info.cmm" "&export_dir\y.info.txt" "&_global_osa_tx_thread_doing"
+    print "  [Task doing: &_global_osa_tx_thread_doing] in [owner: &_global_symbol_source]"
+  )
+  if ("&_global_osa_tx_thread_entry"!="")
+  (
+    print "  [Task entry: &_global_osa_tx_thread_entry]"
+  )
+  
+  ; get thread name
+  global &_global_tx_thread_current_name
+  &_global_tx_thread_current_name=""
+  do "&curr_script_dir\_tx_thread_current_name.cmm" "&assert_root_core_index" "&assert_core_num"
+  if ("&_global_tx_thread_current_name"!="")
+  (
+    print "  [Task name: &_global_tx_thread_current_name]"
+  )
+)
+
+enddo

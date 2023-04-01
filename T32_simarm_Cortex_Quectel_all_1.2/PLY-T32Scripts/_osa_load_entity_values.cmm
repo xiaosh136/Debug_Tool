@@ -1,0 +1,199 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  OSA Component                                                                                         ;;
+;;                                                                                                        ;;
+;;    OSA : Load Entity Values                                                                            ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+global &ENTITY_INFRA &ENTITY_STACK &ENTITY_GSM_STACK &ENTITY_W_STACK &ENTITY_SIGNAL
+global &ENTITY_TD_LTE_STACK &ENTITY_IMS_STACK &ENTITY_NR_STACK
+global &ENTITY_PSEUDO_START &ENTITY_OSA &ENTITY_USER &ENTITY_LAST &ENTITY_KAL
+
+;PMACRO.list
+local &err
+&err=0
+&curr_script_dir=os.ppd()
+&export_dir="&_global_export_dir"
+
+; const values
+&ENTITY_INFRA=0x0
+&ENTITY_STACK=0x1
+&ENTITY_GSM_STACK=0x2
+&ENTITY_W_STACK=0x3
+&ENTITY_SIGNAL=0x4
+&ENTITY_TD_LTE_STACK=0x5
+&ENTITY_IMS_STACK=0x6
+&ENTITY_NR_STACK=0x7
+&ENTITY_PSEUDO_START=0x8
+&ENTITY_OSA=&ENTITY_PSEUDO_START
+&ENTITY_USER=&ENTITY_OSA+1
+&ENTITY_LAST=&ENTITY_USER+1
+&ENTITY_KAL=&ENTITY_LAST+1
+
+; Init ENTTITY_<xxxx> values from enum sdi_entity_enum
+
+&tmp_ouput_file="&export_dir\tmp_typeinfo_sdi_entity_enum.txt"
+printer.open "&tmp_ouput_file"
+winprint.symbol.typeinfo enum sdi_entity_enum
+printer.close
+;winclear top
+
+&has_entity_items=0
+&entity_item_value=0
+local &myline
+open #3 "&tmp_ouput_file" /read
+read #3 %line &myline
+while !file.eof(3)
+(
+  read #3 %line &myline
+  if (string.scan("&myline","ENTITY_",0)!=-1)
+  (
+    &start_pos=string.scan("&myline","ENTITY_",0)
+    &endPos=&start_pos
+    while (&endPos<&start_pos+32)
+    (
+      if (string.char("&myline", &endPos)==0x20)||(string.char("&myline", &endPos)==0x0d)||(string.char("&myline", &endPos)==0x0a)
+      (
+        break
+      )
+      &endPos=&endPos+1
+    )
+    &entity_item_name=string.mid("&myline", &start_pos, &endPos-&start_pos)
+    &equal_pos=string.scan("&myline"," = ",&start_pos)
+    if (&equal_pos!=-1)
+    (
+      &has_entity_items=&has_entity_items+1
+      if (("&entity_item_name"=="ENTITY_TD_LTE_STACK"))
+      (
+        &ENTITY_TD_LTE_STACK=&entity_item_value
+      )
+      else if (("&entity_item_name"=="ENTITY_IMS_STACK"))
+      (
+        &ENTITY_IMS_STACK=&entity_item_value
+      )
+      else if (("&entity_item_name"=="ENTITY_NR_STACK"))
+      (
+        &ENTITY_NR_STACK=&entity_item_value
+      )
+      else if (("&entity_item_name"=="ENTITY_PSEUDO_START"))
+      (
+        &entity_item_value=&entity_item_value-1
+      )
+      else if (("&entity_item_name"=="ENTITY_OSA"))
+      (
+        &ENTITY_OSA=&entity_item_value
+        &ENTITY_USER=&ENTITY_OSA+1
+        &ENTITY_LAST=&ENTITY_USER+1
+        &ENTITY_KAL=&ENTITY_LAST+1
+      
+        ; Remove non-existed items
+        if (&ENTITY_TD_LTE_STACK>=&ENTITY_OSA)
+        (
+          &ENTITY_TD_LTE_STACK=&ENTITY_KAL
+        )
+        if (&ENTITY_IMS_STACK>=&ENTITY_OSA)
+        (
+          &ENTITY_IMS_STACK=&ENTITY_KAL
+        )
+        if (&ENTITY_NR_STACK>=&ENTITY_OSA)
+        (
+          &ENTITY_NR_STACK=&ENTITY_KAL
+        )
+      )
+      &entity_item_value=&entity_item_value+1
+    )
+  )
+)
+close #3
+
+del "&tmp_ouput_file"
+
+; Init ENTTITY_<xxxx> values from entity_name[]
+if (&has_entity_items==0)
+(
+  &entity_cnt=v.value(sizeof(entity_name)/sizeof(entity_name[0]))
+  &entity_id=0
+  while (&entity_id<&entity_cnt)
+  (
+    &entity_name_str=data.string(d:v.value(entity_name[&entity_id]))
+    if (("&entity_name_str"=="ENTITY_INFRA")||("&entity_name_str"=="ENTITY_DEFAULT"))
+    (
+      &ENTITY_INFRA=&entity_id
+    )
+    else if (("&entity_name_str"=="ENTITY_STACK"))
+    (
+      &ENTITY_STACK=&entity_id
+    )
+    else if (("&entity_name_str"=="ENTITY_GSM_STACK"))
+    (
+      &ENTITY_GSM_STACK=&entity_id
+    )
+    else if (("&entity_name_str"=="ENTITY_W_STACK"))
+    (
+      &ENTITY_W_STACK=&entity_id
+    )
+    else if (("&entity_name_str"=="ENTITY_SIGNAL"))
+    (
+      &ENTITY_SIGNAL=&entity_id
+    )
+    else if (("&entity_name_str"=="ENTITY_TD_LTE_STACK"))
+    (
+      &ENTITY_TD_LTE_STACK=&entity_id
+    )
+    else if (("&entity_name_str"=="ENTITY_IMS_STACK"))
+    (
+      &ENTITY_IMS_STACK=&entity_id
+    )
+    else if (("&entity_name_str"=="ENTITY_NR_STACK"))
+    (
+      &ENTITY_NR_STACK=&entity_id
+    )
+    else if (("&entity_name_str"=="ENTITY_OSA"))
+    (
+      &ENTITY_OSA=&entity_id
+      &ENTITY_USER=&ENTITY_OSA+1
+      &ENTITY_LAST=&ENTITY_USER+1
+      &ENTITY_KAL=&ENTITY_LAST+1
+      
+      ; Remove non-existed items
+      if (&ENTITY_TD_LTE_STACK>=&ENTITY_OSA)
+      (
+        &ENTITY_TD_LTE_STACK=&ENTITY_KAL
+      )
+      if (&ENTITY_IMS_STACK>=&ENTITY_OSA)
+      (
+        &ENTITY_IMS_STACK=&ENTITY_KAL
+      )
+      if (&ENTITY_NR_STACK>=&ENTITY_OSA)
+      (
+        &ENTITY_NR_STACK=&ENTITY_KAL
+      )
+    )
+    &entity_id=&entity_id+1
+  )
+)
+
+enddo
+

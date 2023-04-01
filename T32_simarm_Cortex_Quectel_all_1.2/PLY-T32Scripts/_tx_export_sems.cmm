@@ -1,0 +1,188 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  TX Component                                                                                          ;;
+;;                                                                                                        ;;
+;;    Mutex: Save the mutexes info into the HOST file.                                                    ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; Create logging output window
+area.create logging_win 200. 500.
+area.select logging_win
+area.view logging_win
+
+;PMACRO.list
+local &err
+&err=0
+
+; Enter the export directory if null
+global &_global_export_dir
+&curr_script_dir=os.ppd()
+do "&curr_script_dir\_setting_input_export_dir_if_null.cmm"
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+
+; Makeup output file path
+local &output_file_path
+local &output_file_name
+local &core_name
+if symbol.exist(LOG_magicHeader)
+(
+  &core_name=data.string(d:v.value(LOG_magicHeader.coreName))
+  &output_file_name="tx_seminfo_&(core_name).txt"
+)
+else
+(
+  &output_file_name="tx_seminfo.txt"
+)
+&output_file_path="&(export_dir)/&output_file_name"
+
+print "Export to directory : &(export_dir)"
+print "Start time : " clock.date() "  " clock.time() "  ..."
+print ""
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Start ...                                                                                             ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &head_symbol
+&head_symbol="_tx_semaphore_created_ptr"
+if !(symbol.exist(&head_symbol))
+(
+  &err=1
+  print "Error: `_tx_semaphore_created_ptr' does not exist. EXIT script"
+  goto CMM_END
+)
+
+; Create output file
+area.create output_file_win 200. 500.
+area.open output_file_win "&output_file_path"
+area.select output_file_win
+
+local &head_symbol_val &ptr
+local &created_cnt
+&created_cnt=0
+
+print "===============Semaphore Info==============="
+print "    No    Addr   Counter   Suspended  Name "
+
+&ptr=v.value((TX_SEMAPHORE*)&head_symbol)
+&head_symbol_val=v.value((TX_SEMAPHORE*)&head_symbol)
+
+CMM_LOOP:
+&sem_id=v.value(((TX_SEMAPHORE*)&ptr)->tx_semaphore_id)
+if &sem_id!=0x53454D41
+(
+  ; The event list has been destroied 
+  print "Current semaphore list has been destroied !!!"
+  goto CMM_FILE_CLOSE
+)
+
+&sem_count=v.value(((TX_SEMAPHORE*)&ptr)->tx_semaphore_count)
+&sem_suspended_count=v.value(((TX_SEMAPHORE*)&ptr)->tx_semaphore_suspended_count)
+&sem_string_addr=v.value(((TX_SEMAPHORE*)&ptr)->tx_semaphore_name)
+print "  " format.decimal(4, v.value(&created_cnt+1)) "  " &ptr "  " format.decimal(4,v.value(&sem_count)) "  " format.decimal(8,v.value(&sem_suspended_count)) "      " data.string(d:&sem_string_addr) 
+
+&sem_suspension_list=v.value(((TX_SEMAPHORE*)&ptr)->tx_semaphore_suspension_list)
+if &sem_suspension_list!=0
+(
+  ; Print all the tasks info suspended the list 
+  &suspension_list=&sem_suspension_list
+CMM_LOOP_2:
+  &sem_string_addr=v.value(((TX_THREAD*)&suspension_list)->tx_thread_name)
+  
+  print "        Suspend Task :  " data.string(d:&sem_string_addr)
+  
+  local &suspension_list_tmp
+  if (v.value("sizeof(TX_THREAD)")==v.value("188"))
+  (
+    &suspension_list_tmp=v.value(((TX_THREAD*)&suspension_list)->tx_suspended_next)
+  )
+  else
+  (
+    &suspension_list_tmp=v.value(((TX_THREAD*)&suspension_list)->tx_thread_suspended_next)
+  )
+  &suspension_list=&suspension_list_tmp
+  if (&suspension_list!=0)&&(&suspension_list!=&sem_suspension_list)
+  (
+    goto CMM_LOOP_2
+  )
+)
+
+&ptr_tmp=v.value(((TX_SEMAPHORE*)&ptr)->tx_semaphore_created_next)
+&ptr=&ptr_tmp
+&created_cnt=&created_cnt+1
+
+if &ptr==0
+(
+  ; check if the semaphore list has been destroied 
+  print "Current semaphore list has been destroied !!!"
+  goto CMM_FILE_CLOSE
+)
+
+if &ptr!=&head_symbol_val
+  goto CMM_LOOP
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Counter Info                                                                                          ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+print ""
+print "===============Counter Info==============="
+&created_cnt=format.decimal(8,&created_cnt)
+print " Created counter: &created_cnt"
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  End                                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_FILE_CLOSE:
+print ""
+area.close output_file_win
+area.clear output_file_win
+
+type "&output_file_path"
+
+CMM_END:
+area.select logging_win
+
+print ""
+print "End time : " clock.date() "  " clock.time() "  "
+
+; Close the logging output window
+; wait 1s
+if (&err==0)
+(
+  area.close logging_win
+  do "&curr_script_dir\_trace32_area_delete.cmm" "logging_win"
+)
+
+enddo

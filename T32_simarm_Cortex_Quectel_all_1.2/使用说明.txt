@@ -1,11 +1,12 @@
 解析步骤：
 展锐:
 8910：
-1.  将抓取到的dump文件，固件编译生成的的8915DM_cat1_open_core.elf和appimage.elf文件放入8910dump文件夹下
+1. 将抓取到的dump文件，固件编译生成的的8915DM_cat1_open_core.elf和appimage.elf文件放入8910dump文件夹下
 2. 运行T32_8910_Quectel_ap.bat脚本可自动进行dump解析，
 
 8310:
-请执行：T32_UNISOC_Quectel_uis8310.bat，会自动弹出需要加载的文件，如：
+请执行：T32_UNISOC_Quectel_uis8310.bat，界面打开之后点击菜单[Pizer Love You!](该菜单是展锐的插件可以快速分析)
+弹窗之后输入2，然后再敲回车，然后会自动弹出需要加载的文件，如：
 1、加载UMS9117_uis8310_MI_1h10_64M_VSIM_halo.axf (后缀名axf)；
 2、加载armlog下的2022_08_24_14_43_26_088_1.mem (后缀名mem)
 

@@ -1,0 +1,267 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Assert Component                                                                                      ;;
+;;                                                                                                        ;;
+;;    Assert: Analyze assert info                                                                         ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;  2021/11/15      Yi.Yang                     Queue_Full Analysis                                          ;;
+;;                                                                                                          ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &caller_assert_win &assert_core_name &assert_core_num &caller_assert_info &assert_root_core_name &assert_root_core_index
+entry &caller_assert_win &assert_core_name &assert_core_num &caller_assert_info &assert_root_core_name &assert_root_core_index
+
+; remove \"\"
+&caller_assert_win=&caller_assert_win
+&caller_assert_info=&caller_assert_info
+&assert_core_name=&assert_core_name
+&assert_core_num=&assert_core_num
+&assert_root_core_name=&assert_root_core_name
+&assert_root_core_index=&assert_root_core_index
+
+local &output_file_path_t
+local &output_file_name_t
+local &output_file_path_q
+local &output_file_name_q
+
+&curr_script_dir=os.ppd()
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+if symbol.exist(LOG_magicHeader)
+(
+  &output_file_name_t="queue_full_threadinfo_&(assert_core_name).txt"
+  &output_file_name_q="queue_full_queueinfo_&(core_name).txt"
+)
+else
+(
+  &output_file_name_t="queue_full_threadinfo.txt"
+  &output_file_name_q="queue_full_queueinfo_.txt"
+)
+&output_file_path_t="&(export_dir)/&output_file_name_t"
+&output_file_path_q="&(export_dir)/&output_file_name_q"
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Thread Info                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &head_symbol_val &ptr
+local &created_cnt
+
+local &head_symbol
+&head_symbol="_tx_thread_created_ptr"
+if !(symbol.exist(&head_symbol))
+(
+  &err=1
+  print "Error: `_tx_thread_created_ptr' does not exist. EXIT script"
+  goto CMM_END
+)
+
+; Create output file
+area.create output_file_win 200. 500.
+area.open output_file_win "&output_file_path_t"
+area.select output_file_win
+
+&ptr=v.value((TX_THREAD*)&head_symbol)
+&head_symbol_val=v.value((TX_THREAD*)&head_symbol)
+
+local &name
+CMM_LOOP_1:
+
+&thread_id=v.value(((TX_THREAD*)&ptr)->tx_thread_id)
+if (&thread_id==0x54485244)
+(
+  local &thread_string_addr &thread_priority &thread_created_next
+  if (v.value(sizeof(TX_THREAD))==0xd4) ; size is 212 (smp)
+  (
+    &name=v.value(((TX_THREAD*)&ptr)->tx_thread_name)
+    &name=data.string(d:&name)
+    &thread_created_next=v.value(((TX_THREAD*)&ptr)->tx_thread_created_next)
+  )
+  else if (v.value(sizeof(TX_THREAD))==0xb0) ;cm4
+  (
+    &name=v.value(((TX_THREAD*)&ptr)->tx_thread_name)
+    &name=data.string(d:&name)
+    &thread_created_next=v.value(((TX_THREAD*)&ptr)->tx_thread_created_next)
+  )
+  else
+  (
+    &name=v.value(((TX_THREAD*)&ptr)->tx_thread_name)
+    &name=data.string(d:&name)
+    &thread_created_next=v.value(((TX_THREAD*)&ptr)->tx_created_next)
+  )
+ 
+  print "&ptr" "    &name"
+  
+  &ptr_tmp=&thread_created_next
+  &ptr=&thread_created_next
+  
+  if (&ptr!=&head_symbol_val)&&(&ptr!=0)
+    goto CMM_LOOP_1
+)
+else
+(
+    goto CMM_END
+)
+area.close output_file_win
+area.clear output_file_win
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Enqueued Queue Info                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+area.open output_file_win "&output_file_path_q"
+area.select output_file_win
+
+&head_symbol="_tx_queue_created_ptr"
+&ptr=v.value((TX_QUEUE*)&head_symbol)
+&head_symbol_val=v.value((TX_QUEUE*)&head_symbol)
+
+CMM_LOOP_2:
+
+&queue_id=v.value(((TX_QUEUE*)&ptr)->tx_queue_id)
+if (&queue_id==0x51554555)
+(
+  &queue_string_addr=v.value(((TX_QUEUE*)&ptr)->tx_queue_name)
+  &queue_message_size=v.value(((TX_QUEUE*)&ptr)->tx_queue_message_size)
+  &queue_capacity=v.value(((TX_QUEUE*)&ptr)->tx_queue_capacity)
+  &queue_enqueued=v.value(((TX_QUEUE*)&ptr)->tx_queue_enqueued)
+  &queue_available_storage=v.value(((TX_QUEUE*)&ptr)->tx_queue_available_storage)
+  &queue_suspended_count=v.value(((TX_QUEUE*)&ptr)->tx_queue_suspended_count)
+  if (v.value(&queue_enqueued)>v.value("0"))
+  (
+    if (&queue_capacity==&queue_enqueued)
+    (
+      print "QueFull    " data.string(d:&queue_string_addr)
+    )
+    else
+    (
+      print "Normal    " data.string(d:&queue_string_addr)
+    )
+  )
+  
+  &ptr_tmp=v.value(((TX_QUEUE*)&ptr)->tx_queue_created_next)
+  &ptr=&ptr_tmp
+  
+  if (&ptr!=&head_symbol_val)&&(&ptr!=0)
+    goto CMM_LOOP_2
+)
+area.close output_file_win
+area.clear output_file_win
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Match queue and thread                                                                                  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; analyze assert info , case 13 : "threadx_mem.c" & "The queue was full"
+if (string.scan("&caller_assert_info", "threadx_os_iram.c", 0)!=-1)&&(string.scan("&caller_assert_info","The queue was full",0)!=-1)
+(
+  area.select &caller_assert_win
+  print "Assert Info: &caller_assert_info"
+  print ""
+  OS.Command &curr_script_dir\run_py.bat "&export_dir\_queue_full_analysis.py" &output_file_path_t &output_file_path_q "&export_dir\queue_analysis.txt"
+  wait 1.s
+
+  print "Corresponding queue:"
+  open #1 "&output_file_path_q" /read
+  read #1 %line &myline
+
+  while !file.eof(1)
+  (
+    print "&myline"
+    read #1 %line &myline
+  )
+  close #1
+  print ""
+  open #2 "&export_dir\queue_analysis.txt" /read
+  read #2 %line &myline
+  local &task_ptr
+  print "Corresponding thread:"
+  while !file.eof(2)
+  (
+    &task_ptr=v.value("&myline")
+    &thread_id=v.value(((TX_THREAD*)&task_ptr)->tx_thread_id)
+    if (&thread_id==0x54485244)
+    (
+      local &thread_string_addr &thread_priority &thread_created_next
+      if (v.value(sizeof(TX_THREAD))==0xd4) ; size is 212 (smp)
+      (
+        &name=v.value(((TX_THREAD*)&task_ptr)->tx_thread_name)
+        &name=data.string(d:&name)
+      )
+      else if (v.value(sizeof(TX_THREAD))==0xb0) ;cm4
+      (
+        &name=v.value(((TX_THREAD*)&task_ptr)->tx_thread_name)
+        &name=data.string(d:&name)
+      )
+      else
+      (
+        &name=v.value(((TX_THREAD*)&task_ptr)->tx_thread_name)
+        &name=data.string(d:&name)
+      )
+  
+      print "&task_ptr(&name)"
+    )
+    else
+    (
+        goto CMM_END
+    )
+    read #2 %line &myline
+  )
+  print ""
+
+
+  if (v.value(&assert_core_num)>v.value("1"))
+  (
+    printer.open "&export_dir\queue_full_v.f.txt"
+    winprint.v.f /core &assert_root_core_index /Locals /Caller /Task &task_ptr
+    printer.close
+    ;winclear top
+  )
+  else
+  (
+    printer.open "&export_dir\queue_full_v.f.txt"
+    winprint.v.f /Locals /Caller /Task &task_ptr
+    printer.close
+    ;winclear top
+  )
+  close #2
+
+  open #3 "&export_dir\queue_full_v.f.txt" /read
+  read #3 %line &myline
+
+  while !file.eof(3)
+  (
+    print "&myline"
+    read #3 %line &myline
+  )
+  close #3
+)
+
+CMM_END:
+enddo

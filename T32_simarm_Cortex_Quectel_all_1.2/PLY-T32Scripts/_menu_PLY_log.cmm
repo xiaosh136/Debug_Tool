@@ -1,0 +1,91 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Menu Component                                                                                        ;;
+;;                                                                                                        ;;
+;;    PLY Menu : LOG                                                                                      ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Set the PLY script directory
+global &_global_PLY_script_dir
+&_global_PLY_script_dir=os.ppd()
+&curr_script_dir=os.ppd()
+
+MENU.ReProgram
+(
+  ADD
+  MENU
+  (
+    POPUP "[[Pizer Love You!]"
+    (
+      POPUP "V3-LOG"
+      (
+        ; Show basic log info (modem)
+        MENUITEM "Log Basic Information" "v.w %string LOG_magicHeader.magicName %decimal LOG_magicHeader.staticLogLevel %decimal LOG_currLogLevel %decimal LOG_magicHeader.dynmicalFilterSupported %decimal LOG_seqNum %decimal LOG_dropFrames %decimal LOG_dropTotalFrames LOG_magicHeader LOG_currFrameBuffer LOG_currDataIndex (struct DataChannel *)LOG_chan LOG_transFailureCnt g_sblock_mgr[0] g_proto_sblock[0] (struct SblockChannelBuffer *)LOG_sendingChannelBuffer LOG_sendingFrameBuffer"
+        MENUITEM "Log Lost Information" "v.w %decimal LOG_dropFrames %decimal LOG_dropTotalFrames LOG_getNoBuffCnt LOG_nochanGetBuffCnt"
+        AFTER "Log Lost Information"
+        SEPARATOR
+        
+        ; Show chan buff list.
+        MENUITEM "Transport Channel Buffer List"
+        (
+          do "&_global_PLY_script_dir\_log_chan_buf_list.cmm"
+        )
+        
+        ; Show chan buff track info.
+        MENUITEM "Transport Channel Tracks List"
+        (
+          do "&_global_PLY_script_dir\_log_chan_buf_tracks.cmm"
+        )
+        
+        ; Show pool share memory list
+        MENUITEM "Physical Pool Shared-Memory List"
+        (
+          do "&_global_PLY_script_dir\_log_pool_shmem_list.cmm"
+        )
+        
+        ; Show ring share memory list
+        MENUITEM "Physical Ring Shared-Memory List"
+        (
+          do "&_global_PLY_script_dir\_log_ring_shmem_list.cmm"
+        )
+        AFTER "Physical Ring Shared-Memory List"
+        SEPARATOR
+        
+        ; Dump last one frame to file
+        MENUITEM "Dump Last One Frame Buffer to File"
+        (
+          do "&_global_PLY_script_dir\_log_last_one_frame.cmm"
+        )
+        ; Convert a memory file to file
+        MENUITEM "Convert Memory File to Log File"
+        (
+          do "&_global_PLY_script_dir\_log_mem_file_2_log.cmm"
+        )
+      )
+    )
+  )
+)
+
+enddo

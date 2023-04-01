@@ -1,0 +1,100 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  TM Component                                                                                          ;;
+;;                                                                                                        ;;
+;;    Task Monitor : Export the data to the host file                                                     ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;  2021/11/08      Yi.Yang                     Add IRQ Name Parse                                                   ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;PMACRO.list
+local &err
+&err=0
+
+entry &intLogicNum
+global &irq_name
+
+&irq_name="unknown"
+if symbol.exist(irq_isr_array)
+(
+)
+else
+(
+  &err=1
+  goto CMM_END
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Start ...                                                                                             ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &index
+local &max_index
+
+&index=0
+&max_index=v.value(tm_info.head.nrof_irq)
+
+FIND_LOOP:
+if (v.value(irq_isr_array[&index].intLogicNum)==v.value(&intLogicNum))
+(
+  goto FOUND
+)
+&index=&index+1
+if (v.value(&index)<v.value(&max_index))
+(
+  goto FIND_LOOP
+)
+
+FOUND:
+local &handler
+&handler=v.value(irq_isr_array[&index].Handlefunc)
+&irq_name=symbol.function(p:v.value(&handler))
+if ("&irq_name")!=""
+(
+  local &offset
+  &offset=-1
+  local &res
+  &res=string.scan("&irq_name", "\", 0)
+  local &name_len
+  while (v.value(&res)>=v.value(&offset))
+  (
+    &offset=&res+1
+    &res=string.scan("&irq_name", "\", v.value(&offset))
+  )
+  if (v.value(&offset)!=v.value("-1"))
+  (
+    &name_len=string.length("&irq_name")
+    &irq_name=string.mid("&irq_name",v.value(&offset),v.value(&name_len))
+  )
+)
+else
+(
+  &irq_name="&intLogicNum"
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  End                                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+CMM_END:
+enddo

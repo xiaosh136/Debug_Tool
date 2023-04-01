@@ -1,0 +1,461 @@
+
+local &caller_analyze_app_stack_addr
+entry &caller_analyze_app_stack_addr
+&caller_analyze_app_stack_addr=&caller_analyze_app_stack_addr
+
+&curr_script_dir=os.ppd()
+&export_dir="&_global_export_dir"
+
+; Create logging output window
+area.create analyze_app_stack_manual_win 200. 500.
+area.select analyze_app_stack_manual_win
+area.view analyze_app_stack_manual_win
+
+global &_global_export_dir
+local &ptr
+if ("&caller_analyze_app_stack_addr"=="")
+(
+  print "Please enter the address of thread: "
+  enter &ptr
+)
+else
+(
+  &ptr=&caller_analyze_app_stack_addr
+)
+if ("&ptr"=="")
+(
+  &err=1
+  print "Error: No input !!!. EXIT script"
+  goto CMM_END
+)
+if (string.scan("&ptr","0x",0)==-1)&&(string.scan("&ptr","0X",0)==-1)
+(
+  &ptr_string="0x&ptr"
+  &ptr=v.value(&ptr_string)
+)
+&thread_id=v.value(((TX_THREAD*)&ptr)->tx_thread_id)
+if &thread_id!=0x54485244
+(
+  print "Error: " &ptr " is not valid thread, or had been destroied !!!. EXIT script"
+  goto CMM_END
+)
+
+local &appThreadValue &threadPtr &stackStart &stackEnd &appThreadName &stackPossibleListValue &stackFrameValue &stackMaxLevel &stackCurLevel
+&appThreadValue="&ptr"
+&threadPtr=v.value("&appThreadValue")
+&stackStart=0
+&stackEnd=0
+&appThreadName=""
+&stackPossibleListValue=""
+&stackFrameValue=""
+&stackMaxLevel=0
+&stackCurLevel=0
+global &_global_org_tx_thread_current_ptr &_global_org_tx_thread_current_ptr_ref_count
+if ("&_global_org_tx_thread_current_ptr"=="")
+(
+  &_global_org_tx_thread_current_ptr=0
+)
+if ("&_global_org_tx_thread_current_ptr_ref_count"=="")
+(
+  &_global_org_tx_thread_current_ptr_ref_count=0
+)
+
+; Only 1 instance allowed.
+if (&_global_org_tx_thread_current_ptr_ref_count!=0)
+(
+  print "Error: there's a existed window!!!. EXIT script"
+  goto CMM_END
+)
+
+area.close analyze_app_stack_manual_win
+do "&curr_script_dir\_trace32_area_delete.cmm" "analyze_app_stack_manual_win"
+
+if (v.value("sizeof(TX_THREAD)")==v.value("188")||v.value("sizeof(TX_THREAD)")==v.value("192"))
+(
+  &stackStart=v.value(((TX_THREAD*)&threadPtr)->tx_stack_start)
+  &stackEnd=&stackStart+v.value(((TX_THREAD*)&threadPtr)->tx_stack_size)
+  &appThreadName=v.value(((TX_THREAD*)&threadPtr)->tx_thread_name)
+  &appThreadName=data.string(d:&appThreadName)
+)
+else
+(
+  &stackStart=v.value(((TX_THREAD*)&threadPtr)->tx_thread_stack_start)
+  &stackEnd=&stackStart+v.value(((TX_THREAD*)&threadPtr)->tx_thread_stack_size)
+  &appThreadName=v.value(((TX_THREAD*)&threadPtr)->tx_thread_name)
+  &appThreadName=data.string(d:&appThreadName)
+)
+
+print "Analyze stack of &name: 0x" v.value(&threadPtr) " , stack: 0x" v.value(&stackStart) " - 0x" v.value(&stackEnd)
+print "{"
+
+&start=&stackStart
+&end=&stackEnd
+&level=0
+&tmpStackPossibleListValue=""
+while (v.value(&start)<v.value(&end))
+(
+  &value=v.value(*(unsigned int *)&start)
+  &name=symbol.function(p:v.value(&value))
+  if ("&name")!=""
+  (
+    &offset=-1
+    local &res
+    &res=string.scan("&name", "\", 0)
+    while (v.value(&res)>=v.value(&offset))
+    (
+      &offset=&res+1
+      &res=string.scan("&name", "\", v.value(&offset))
+    )
+    if (v.value(&offset)==v.value("-1"))
+    (
+      print "  [0x" v.value(&start) "] " "0x" v.value(&value) " " "&name"
+      &startString=v.value(&start)
+      &valueString=v.value(&value)
+      &levelString=v.value(&level)
+      if (string.length("&tmpStackPossibleListValue")<0xc00)
+      (
+        if ("&tmpStackPossibleListValue"!="")
+        (
+          &tmpStackPossibleListValue="&tmpStackPossibleListValue"+conv.char(0xa)
+        )
+        &tmpStackPossibleListValue="&tmpStackPossibleListValue"+"&levelString|"+"[&startString] &valueString &name"
+      )
+      else
+      (
+        if ("&tmpStackPossibleListValue"!="")
+        (
+          &tmpStackPossibleListValue="&tmpStackPossibleListValue"+conv.char(0xa)
+        )
+        &tmpStackPossibleListValue="&tmpStackPossibleListValue"+"&levelString|"+"..."
+      )
+      &level=&level+1
+    )
+    else
+    (
+      &name_len=string.length("&name")
+      &sub_name=string.mid("&name",v.value(&offset),v.value(&name_len))
+      print "  [0x" v.value(&start) "] " "0x" v.value(&value) " " "&sub_name"
+      &startString=v.value(&start)
+      &valueString=v.value(&value)
+      &levelString=v.value(&level)
+      if (string.length("&tmpStackPossibleListValue")<0xc00)
+      (
+        if ("&tmpStackPossibleListValue"!="")
+        (
+          &tmpStackPossibleListValue="&tmpStackPossibleListValue"+conv.char(0xa)
+        )
+        &tmpStackPossibleListValue="&tmpStackPossibleListValue"+"&levelString|"+"[&startString] &valueString &sub_name"
+      )
+      else
+      (
+        if ("&tmpStackPossibleListValue"!="")
+        (
+          &tmpStackPossibleListValue="&tmpStackPossibleListValue"+conv.char(0xa)
+        )
+        &tmpStackPossibleListValue="&tmpStackPossibleListValue"+"&levelString|"+"..."
+      )
+      &level=&level+1
+    )
+  )
+  &start=&start+0x4
+)
+
+&stackMaxLevel=&level
+&stackPossibleListValue="&tmpStackPossibleListValue"
+
+print "}"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Dialog View                                                                                           ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+DIALOG.view
+(
+  HEADER "Analyze App Stack"
+  
+  ; <x> <y> <w> <h>
+  
+  POS 1. 1. 8.
+  AppThreadText: TEXT "App Thread:"
+  
+  POS 1. 3. 
+  StackListText: TEXT "Stack list:"
+  POS 28. 3. 3
+  TEXT "R13:"
+  POS 1. 13. 
+  StackFrameText: TEXT "Stack frame:"
+  
+  POS 9. 1. 11.
+  AppThread: EDIT "" ""
+  
+  POS 20. 1. 20.
+  AppThreadName: EDIT "" ""
+  
+  POS 20. 3. 4. 1.
+  PrevBtn: BUTTON "Prev" 
+  (
+    if (&stackCurLevel>0)
+    (
+      &stackCurLevel=&stackCurLevel-1
+    )
+    gosub CMM_SUB_UPD
+  )
+  
+  POS 24. 3. 4. 1.
+  NextBtn: DEFBUTTON "Next"
+  (
+    if ((&stackMaxLevel>0)&&(&stackCurLevel<&stackMaxLevel-1))
+    (
+      &stackCurLevel=&stackCurLevel+1
+    )
+    gosub CMM_SUB_UPD
+  )
+  
+  POS 32. 3. 10. 1
+  R13Edit: EDIT "" ""
+  
+  POS 1. 4. 50. 8
+  StackList: MEDIT "" ""
+  (
+  )
+  
+  POS 1. 14. 50. 8
+  StackFrame: MEDIT "" ""
+  
+  CLOSE "GOTO cancel"
+)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Initialize                                                                                             ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+  ; switch context
+  gosub CMM_SUB_INIT_SWITCH_CONTEXT
+  
+  dialog.set AppThread "&appThreadValue"
+  dialog.set AppThreadName "&appThreadName"
+  dialog.set StackList "&stackPossibleListValue"
+  dialog.set StackFrame "&stackFrameValue"
+  dialog.disable R13Edit
+  dialog.disable AppThread
+  dialog.disable AppThreadName
+  gosub CMM_SUB_UPD
+  
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  STOP command halts script execution                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;STOP command halts script execution 
+  STOP
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  continue script                                                                                       ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+  ; switch context
+  gosub CMM_SUB_DEINIT_SWITCH_CONTEXT
+  
+  DIALOG.END
+ENDDO
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  goto cancel - here                                                                                    ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+cancel:
+
+  ; switch context
+  gosub CMM_SUB_DEINIT_SWITCH_CONTEXT
+  
+  DIALOG.END
+ENDDO
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Sub of init switch context                                                                            ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_SUB_INIT_SWITCH_CONTEXT:
+
+  ; switch context
+  if (v.value(sizeof(_tx_thread_current_ptr)/sizeof(TX_THREAD *))==1)
+  (
+    if (&_global_org_tx_thread_current_ptr_ref_count==0)
+    (
+      &_global_org_tx_thread_current_ptr=v.value(_tx_thread_current_ptr)
+    )
+    &_global_org_tx_thread_current_ptr_ref_count=&_global_org_tx_thread_current_ptr_ref_count+1
+    var _tx_thread_current_ptr=&threadPtr
+  )
+  else
+  (
+    if (&_global_org_tx_thread_current_ptr_ref_count==0)
+    (
+      &_global_org_tx_thread_current_ptr=v.value(_tx_thread_current_ptr[0])
+    )
+    &_global_org_tx_thread_current_ptr_ref_count=&_global_org_tx_thread_current_ptr_ref_count+1
+    var _tx_thread_current_ptr[0]=&threadPtr
+  )
+  
+  RETURN
+  
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Sub of set switch context                                                                             ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_SUB_SET_SWITCH_CONTEXT:
+
+  ; switch context
+  if (v.value(sizeof(_tx_thread_current_ptr)/sizeof(TX_THREAD *))==1)
+  (
+    var _tx_thread_current_ptr=&threadPtr
+  )
+  else
+  (
+    var _tx_thread_current_ptr[0]=&threadPtr
+  )
+  
+  RETURN
+  
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Sub of deinit switch context                                                                          ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_SUB_DEINIT_SWITCH_CONTEXT:
+
+  ; switch context
+  &_global_org_tx_thread_current_ptr_ref_count=&_global_org_tx_thread_current_ptr_ref_count-1
+  if (&_global_org_tx_thread_current_ptr_ref_count==0)
+  (
+    if (v.value(sizeof(_tx_thread_current_ptr)/sizeof(TX_THREAD *))==1)
+    (
+      var _tx_thread_current_ptr=&_global_org_tx_thread_current_ptr
+    )
+    else
+    (
+      var _tx_thread_current_ptr[0]=&_global_org_tx_thread_current_ptr
+    )
+    &_global_org_tx_thread_current_ptr=0
+  )
+  
+  RETURN
+  
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Sub of update                                                                                         ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_SUB_UPD:
+
+  gosub CMM_SUB_SET_SWITCH_CONTEXT
+  
+  dialog.set R13Edit ""
+  dialog.set StackFrame ""
+  
+  &start=&stackStart
+  &end=&stackEnd
+  &level=0
+  while (v.value(&start)<v.value(&end))
+  (
+    &value=v.value(*(unsigned int *)&start)
+    &name=symbol.function(p:v.value(&value))
+    if ("&name")!=""
+    (
+      &offset=-1
+      local &res
+      &res=string.scan("&name", "\", 0)
+      while (v.value(&res)>=v.value(&offset))
+      (
+        &offset=&res+1
+        &res=string.scan("&name", "\", v.value(&offset))
+      )
+      if (v.value(&offset)==v.value("-1"))
+      (
+        ;print "  [0x" v.value(&start) "] " "0x" v.value(&value) " " "&name"
+        if (&stackCurLevel==&level)
+        (
+          &r13_value=&start+4
+          &r14_value=&value
+          r.s r13 &r13_value
+          r.s r14 &r14_value
+          if (v.value(&r14_value&1)==1)
+          (
+            r.s pc &r14_value-1
+          )
+          else
+          (
+            r.s pc &r14_value
+          )
+          goto CMM_SUB_UPD_FOUND
+        )
+        &level=&level+1
+      )
+      else
+      (
+        &name_len=string.length("&name")
+        &sub_name=string.mid("&name",v.value(&offset),v.value(&name_len))
+        ;print "  [0x" v.value(&start) "] " "0x" v.value(&value) " " "&sub_name"
+        if (&stackCurLevel==&level)
+        (
+          &r13_value=&start+4
+          &r14_value=&value
+          r.s r13 &r13_value
+          r.s r14 &r14_value
+          if (v.value(&r14_value&1)==1)
+          (
+            r.s pc &r14_value-1
+          )
+          else
+          (
+            r.s pc &r14_value
+          )
+          goto CMM_SUB_UPD_FOUND
+        )
+        &level=&level+1
+      )
+    )
+    &start=&start+0x4
+  )
+
+CMM_SUB_UPD_END:
+  RETURN
+  
+CMM_SUB_UPD_FOUND:
+
+  &r13_val=r(r13)
+  dialog.set R13Edit "&r13_val"
+  
+  &tmp_ouput_file="&export_dir\tmp_v.f_task.txt"
+  printer.open "&tmp_ouput_file"
+  winprint.v.f /task &threadPtr
+  printer.close
+  ;winclear top
+  
+  ; print v.f file
+  &str=""
+  local &myline
+  open #3 "&tmp_ouput_file" /read
+  read #3 %line &myline
+  while !file.eof(3)
+  (
+    if ("&str"!="")
+    (
+      &str="&str"+conv.char(0xa)
+    )
+    &str="&str"+"&myline"
+    read #3 %line &myline
+  )
+  close #3
+  
+  del "&tmp_ouput_file"
+  
+  dialog.set StackFrame "&str"
+  goto CMM_SUB_UPD_END
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  End                                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_END:
+
+ENDDO
+

@@ -1,0 +1,81 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  TRACE32 Component                                                                                     ;;
+;;                                                                                                        ;;
+;;    TRACE32 : list &code, get the code line                                                             ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+global &_global_code_line
+entry &caller_code_addr &caller_file_path
+
+; remove \"\"
+&caller_code_addr=&caller_code_addr
+&caller_file_path=&caller_file_path
+&caller_code_addr_str=v.value(&caller_code_addr)
+&caller_code_addr_str="&caller_code_addr_str"
+if (string.scan("&caller_code_addr_str","0x",0)!=-1)
+(
+  &pos=string.scan("&caller_code_addr_str","0x",0)
+  &pos=&pos+2
+  &len=string.length("&caller_code_addr_str")
+  &caller_code_addr_str=string.mid("&caller_code_addr_str",&pos,&len-&pos)
+)
+
+&_global_code_line=""
+
+printer.open "&caller_file_path"
+winprint.list &caller_code_addr
+printer.close
+;winclear top
+
+; analyze file
+local &myline
+open #3 "&caller_file_path" /read
+read #3 %line &myline
+while TRUE()
+(
+  ; has code!
+  if (string.scan("&myline","ST:",0)!=-1)
+  (
+    if (string.scan("&myline","&caller_code_addr_str",0)!=-1)
+    (
+      &_global_code_line="&myline"
+      goto CMM_FIND_END
+    )
+  )
+  if (file.eof(3))
+  (
+    goto CMM_FIND_END
+  )
+  else
+  (
+    read #3 %line &myline
+  )
+)
+CMM_FIND_END:
+close #3
+
+CMM_END:
+enddo

@@ -1,0 +1,134 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Product Config Component                                                                              ;;
+;;                                                                                                        ;;
+;;    The product config (memory layout) for manual input                                                 ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;PMACRO.list
+local &err
+&err=0
+
+global &_global_cpu_num
+;SYSTEM.CPU CORTEXA7
+SYSTEM.CPU *
+print "Please config core nubmer [1]: "
+enter &cpu_core_number
+if ("&cpu_core_number"=="")
+(
+  &cpu_core_number=1
+)
+if (v.value("&cpu_core_number")>1)
+(
+  print "You set core number: &cpu_core_number"
+  SYStem.CONFIG.CoreNumber &cpu_core_number.
+  CORE.ASSIGN 1. 2.
+  &_global_cpu_num=&cpu_core_number
+)
+SYSTEM.UP
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Select the working directory                                                                          ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+GLOBAL &T32SimuPath
+GLOBAL &_global_export_dir
+global &_global_working_dir
+
+LOCAL &T32_ROOT_DIR
+&T32_ROOT_DIR=OS.PSD()
+&T32SimuPath="&T32_ROOT_DIR\demo\arm\kernel\threadx"
+&curr_script_dir=OS.PPD()
+
+print "Please input the working directory [&curr_script_dir]: "
+enter &_global_working_dir
+if ("&_global_working_dir"=="")
+(
+  &_global_working_dir="&curr_script_dir"
+)
+&_global_export_dir="&_global_working_dir"
+title "TRACE32 Simulator [&_global_working_dir]"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Select the AXF file                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+print "Select AXF file: "
+DIALOG.FILE "&_global_working_dir\*.axf"
+ENTRY &axf_file_path
+if ("&axf_file_path"=="")
+(
+  &err=1
+  goto CMM_END
+)
+
+print "Load &axf_file_path ..."
+global &_global_axf_file_path
+&_global_axf_file_path="&axf_file_path"
+d.load "&axf_file_path"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Select the memory file                                                                                ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+print "Select memory file: "
+DIALOG.FILE "&_global_working_dir\*.mem"
+ENTRY %line &mem_file_path
+if ("&mem_file_path"=="")
+(
+  &err=1
+  goto CMM_END
+)
+
+print "Please input the begin address (0x89600000): "
+enter &mem_begin_addr
+if ("&mem_begin_addr"=="")
+(
+  &mem_begin_addr=0x89600000
+)
+else if (string.scan("&mem_begin_addr","0x",0)==-1)&&(string.scan("&mem_begin_addr","0X",0)==-1)
+(
+  &mem_begin_addr_string="0x&mem_begin_addr"
+  &mem_begin_addr=v.value(&mem_begin_addr_string)
+)
+
+print "Load memory file &mem_file_path at &mem_begin_addr ..."
+global &_global_mem_file_path
+&_global_mem_file_path="&mem_file_path"
+d.load.binary "&mem_file_path" &mem_begin_addr /noclear
+
+; Recover stack
+do "&curr_script_dir\_arm_recover_stack.cmm"
+
+CMM_END:
+
+if (&err!=0)
+(
+  enddo false()
+)
+else
+(
+  enddo true()
+)

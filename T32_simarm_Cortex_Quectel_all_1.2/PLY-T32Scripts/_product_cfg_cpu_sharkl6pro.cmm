@@ -1,0 +1,418 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Product Config Component                                                                              ;;
+;;                                                                                                        ;;
+;;    The product config (memory layout) of sharkl6pro                                                    ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;  2021/03/05      Bo.Jiang                    v1.1                                                      ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &cli_axf &cli_mem &cli_begin_address &cli_working_dir
+entry &cli_axf &cli_mem &cli_begin_address &cli_working_dir
+
+; remove \"\"
+&cli_axf=&cli_axf
+&cli_mem=&cli_mem
+&cli_begin_address=&cli_begin_address
+&cli_working_dir=&cli_working_dir
+
+;PMACRO.list
+local &err
+&err=0
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Select the working directory                                                                          ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+global &T32SimuPath
+global &_global_export_dir
+global &_global_working_dir
+
+LOCAL &T32_ROOT_DIR
+&T32_ROOT_DIR=OS.PSD()
+&T32SimuPath="&T32_ROOT_DIR\demo\arm\kernel\threadx"
+&curr_script_dir=OS.PPD()
+
+if ("&cli_working_dir"=="")
+(
+  print "Please input the working directory [&curr_script_dir]: "
+  enter &_global_working_dir
+  if ("&_global_working_dir"=="")
+  (
+    &_global_working_dir="&curr_script_dir"
+  )
+)
+else
+(
+  &_global_working_dir="&cli_working_dir"
+)
+
+&_global_export_dir="&_global_working_dir"
+title "TRACE32 Simulator [&_global_working_dir]"
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Select (but not load) the AXF file                                                                    ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &axf_file_path
+if ("&cli_axf"=="")
+(
+  print "Select AXF file: "
+  DIALOG.FILE "&_global_working_dir\*.axf"
+  ENTRY %line &axf_file_path
+  if ("&axf_file_path"=="")
+  (
+    &err=1
+    goto CMM_END
+  )
+)
+else
+(
+  &axf_file_path="&cli_axf"
+)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Select the subsystem                                                                                  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Select the subsystem
+global &_global_sys_id
+global &_global_cpu_num
+&_global_sys_id=""
+
+if ((string.scan("&axf_file_path", "QogirN6Pro_PS_modem", 0)!=-1))
+(
+  &_global_sys_id="0"
+)
+else if (string.scan("&axf_file_path", "QogirN6Pro_PHY_modem", 0)!=-1)
+(
+  &_global_sys_id="1"
+)
+
+if ("&_global_sys_id"=="")
+(
+  print "Which subsystems for &axf_file_path?"
+  print "  0: PS CP"
+  print "  1: PHY CP"
+  print "Please select the subsystem [*0]:"
+  enter &_global_sys_id
+)
+else
+(
+  print "You select the subsystem : &_global_sys_id"
+)
+if ("&_global_sys_id"!="")
+(
+  &_global_sys_id=v.value(&_global_sys_id)
+)
+else
+(
+  &_global_sys_id=v.value("0")
+)
+
+&_global_cpu_num=2
+SYSTEM.CPU CORTEXR8MPCore
+SYStem.CONFIG.CoreNumber 2.
+CORE.ASSIGN 1. 2.
+
+SYSTEM.OPTION BIGENDIAN OFF
+SYSTEM.UP
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Load the AXF file                                                                                     ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+print "Load &axf_file_path ..."
+global &_global_axf_file_path
+&_global_axf_file_path="&axf_file_path"
+d.load "&axf_file_path"
+
+local &region_name
+local &sys_name
+if (v.value(&_global_sys_id)==v.value("0"))
+(
+  &region_name="PSCP_mem"
+  &sys_name="NR_modem"
+)
+else if (v.value(&_global_sys_id)==v.value("1"))
+(
+  &region_name="PHYCP_mem"
+  &sys_name="Phy"
+)
+
+; check ...
+&core_total_nums=v.value(sizeof(modem_assert_info)/sizeof(modem_assert_info[0]))
+;if (&core_total_nums!=4)
+;(
+;  print "ERROR: it's not sharkl6pro!"
+;  &err=1
+;  goto CMM_END
+;)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Select the memory file                                                                                ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &mem_file_path
+if ("&cli_mem"=="")
+(
+  print "Select memory file: "
+  DIALOG.FILE "&_global_working_dir\*.mem"
+  ENTRY %line &mem_file_path
+  if ("&mem_file_path"=="")
+  (
+    &err=1
+    goto CMM_END
+  )
+)
+else
+(
+  &mem_file_path="&cli_mem"
+)
+
+local &sys_mem_start_addr
+local &sys_mem_len
+
+print "The layout of memory file [" os.file.size("&mem_file_path") " bytes]: "
+print "  0: multiple segments"
+print "  1: single one segment (continunous), the size <= 544MB."
+
+local &ContinunousFlag
+;print "Choose the layout [*0]: "
+;enter &ContinunousFlag
+;if ("&ContinunousFlag"=="")
+;(
+;  &ContinunousFlag=0
+;)
+if (os.file.size("&mem_file_path")<=0x1D800000||os.file.size("&mem_file_path")>0x32000000)
+(
+  &ContinunousFlag=1
+  print "mem size <= 0x1D800000 or mem size > 0x32000000 Auto choose the layout : 1"
+)
+else
+(
+  &ContinunousFlag=0
+  &ContinunousFlag=0
+  print "mem size > 0x1D800000, Auto choose the layout : 0"
+)
+
+if v.value("&ContinunousFlag")!=v.value("1")
+(
+  ; multiple segments
+  &sys_mem_start_addr=0x88000000
+)
+else
+(
+  ; single one seg
+  print "Sysdump memory(sysdump.core.*.list) start address: 0x80000000"
+  print "Modem Block dump memory(all.mem) start address: 0x87800000"
+  print "Enter dump memory start address [*0x87800000]: "
+  enter &sys_mem_start_addr
+  if ("&sys_mem_start_addr"=="")
+  (
+    &sys_mem_start_addr=0x87800000
+  )
+)
+
+print "Load memory file &mem_file_path at &sys_mem_start_addr ..."
+global &_global_mem_file_path
+&_global_mem_file_path="&mem_file_path"
+d.load.binary "&mem_file_path" &sys_mem_start_addr /noclear
+
+if &ContinunousFlag!=1
+(
+  local &sipc_smem_offset
+  local &sipc_smem_len
+  local &sipc_smem_address
+
+  local &aon_apb_debug_offset
+  local &aon_apb_debug_len
+  local &aon_apb_debug_address
+
+  local &pmu_apb_power_offset
+  local &pmu_apb_power_len
+  local &pmu_apb_power_address
+
+  local &pmu_pscp_int_disable_offset
+  local &pmu_pscp_int_disable_len
+  local &pmu_pscp_int_disable_address
+
+  local &pmu_phycp_int_disable_offset
+  local &pmu_phycp_int_disable_len
+  local &pmu_phycp_int_disable_address
+
+  ; SIPC_MEM
+  &sipc_smem_offset=0x1D141000
+  &sipc_smem_len=0x00800000
+  &sipc_smem_address=0x87800000
+  d.save.binary "&_global_working_dir\sipc_smem.bin" (&sys_mem_start_addr+&sipc_smem_offset)++(&sipc_smem_len-1)
+  d.load.Binary "&_global_working_dir\sipc_smem.bin" &sipc_smem_address /NoClear
+  DEL &_global_working_dir\sipc_smem.bin
+
+  ; LOWPOWER_MEM
+  &aon_apb_debug_offset=0x1D96504C
+  &aon_apb_debug_len=0x00000008
+  &aon_apb_debug_address=0x64900CF4
+  d.save.binary "&_global_working_dir\aon_apb_debug.bin" (&sys_mem_start_addr+&aon_apb_debug_offset+0x8)++(&aon_apb_debug_len-1)
+  d.load.Binary "&_global_working_dir\aon_apb_debug.bin" &aon_apb_debug_address /NoClear
+  DEL &_global_working_dir\aon_apb_debug.bin
+
+  &pmu_apb_power_offset=0x1D965010
+  &pmu_apb_power_len=0x0000001C
+  &pmu_apb_power_address=0x6491051C
+  d.save.binary "&_global_working_dir\pmu_apb_power.bin" (&sys_mem_start_addr+&pmu_apb_power_offset+0x8)++(&pmu_apb_power_len-1)
+  d.load.Binary "&_global_working_dir\pmu_apb_power.bin" &pmu_apb_power_address /NoClear
+  DEL &_global_working_dir\pmu_apb_power.bin
+
+  &pmu_pscp_int_disable_offset=0x1D965034
+  &pmu_pscp_int_disable_len=0x00000004
+  &pmu_pscp_int_disable_address=0x649107F0
+  d.save.binary "&_global_working_dir\pmu_pscp_int_disable.bin" (&sys_mem_start_addr+&pmu_pscp_int_disable_offset+0x8)++(&pmu_pscp_int_disable_len-1)
+  d.load.Binary "&_global_working_dir\pmu_pscp_int_disable.bin" &pmu_pscp_int_disable_address /NoClear
+  DEL &_global_working_dir\pmu_pscp_int_disable.bin
+
+  &pmu_phycp_int_disable_offset=0x1D965040
+  &pmu_phycp_int_disable_len=0x00000004
+  &pmu_phycp_int_disable_address=0x64910264
+  d.save.binary "&_global_working_dir\pmu_phycp_int_disable.bin" (&sys_mem_start_addr+&pmu_phycp_int_disable_offset+0x8)++(&pmu_phycp_int_disable_len-1)
+  d.load.Binary "&_global_working_dir\pmu_phycp_int_disable.bin" &pmu_phycp_int_disable_address /NoClear
+  DEL &_global_working_dir\pmu_phycp_int_disable.bin
+
+  if (v.value(&_global_sys_id)==v.value("0"))           ;; PS CP
+  (
+    local &pscp_iram_offset
+    local &pscp_iram_len
+    local &pscp_iram_address
+    local &pscp_llram_offset
+    local &pscp_llram_len
+    local &pscp_llram_address
+    local &pscp_tft_offset
+    local &pscp_tft_len
+    local &pscp_tft_address
+
+    ; PSCP_AON_IRAM
+    &pscp_iram_offset=0x1D000000
+    &pscp_iram_len=0x1000
+    &pscp_iram_address=0x0
+
+    ; PSCP_LLRAM
+    &pscp_llram_offset=0x1D001000
+    &pscp_llram_len=0x40000
+    &pscp_llram_address=0x54100000
+
+    &pscp_tft_offset=0x1D965288
+    &pscp_tft_len=0x8000
+    &pscp_tft_address=0x25230000
+
+    d.save.binary "&_global_working_dir\pscp_iram.bin" (&sys_mem_start_addr+&pscp_iram_offset)++(&pscp_iram_len-1)
+    d.save.binary "&_global_working_dir\pscp_llram.bin" (&sys_mem_start_addr+&pscp_llram_offset)++(&pscp_llram_len-1)
+    d.load.Binary "&_global_working_dir\pscp_iram.bin" &pscp_iram_address /NoClear
+    d.load.Binary "&_global_working_dir\pscp_llram.bin" &pscp_llram_address /NoClear
+    if (v.value(g_dsm_sipa_lp_context.ipa_state)==v.value("1")) ;dump tft reg
+    (
+        d.save.binary "&_global_working_dir\pscp_tft.bin" (&sys_mem_start_addr+&pscp_tft_offset+0x8)++(&pscp_tft_len-1)
+        d.load.Binary "&_global_working_dir\pscp_tft.bin" &pscp_tft_address /NoClear
+        DEL "&_global_working_dir\pscp_tft.bin"
+    )
+    DEL &_global_working_dir\pscp_iram.bin
+    DEL "&_global_working_dir\pscp_llram.bin"
+  )
+  else if (v.value(&_global_sys_id)==v.value("1"))      ;; PHY CP
+  (
+    ; PHYCP_AON_IRAM
+    if symbol.exist(g_phycp_aon_iram_backup)
+    (
+      local &phycp_iram_offset
+      local &phycp_iram_len
+      local &phycp_iram_address
+
+      &phycp_iram_offset=v.value(g_phycp_aon_iram_backup)-&sys_mem_start_addr
+      &phycp_iram_len=0x1000
+      &phycp_iram_address=0x0
+
+      d.save.binary "&_global_working_dir\phycp_iram.bin" (&sys_mem_start_addr+&phycp_iram_offset)++(&phycp_iram_len-1)
+      d.load.Binary "&_global_working_dir\phycp_iram.bin" &phycp_iram_address /NoClear
+
+      DEL "&_global_working_dir\phycp_iram.bin"
+    )
+
+    ; PHYCP_TCM
+    if symbol.exist(g_tcm_core0_addr)
+    (
+      local &phycp_tcm_core0_offset
+      local &phycp_tcm_core0_len
+      local &phycp_tcm_core0_address
+      local &phycp_tcm_core1_offset
+      local &phycp_tcm_core1_len
+      local &phycp_tcm_core1_address
+
+      &phycp_tcm_core0_address=v.value(g_tcm_core0_addr)
+      &phycp_tcm_core0_len=0x00010000
+      &phycp_tcm_core0_offset=&phycp_tcm_core0_address+&phycp_tcm_core0_len-&sys_mem_start_addr	;tcm core0 backup addr offset
+      &phycp_tcm_core1_address=v.value(g_tcm_core1_addr)
+      &phycp_tcm_core1_len=0x00010000
+      &phycp_tcm_core1_offset=&phycp_tcm_core1_address+&phycp_tcm_core1_len-&sys_mem_start_addr	;tcm core1 backup addr offset
+
+      d.save.binary "&_global_working_dir\phycp_tcm_core0.bin" (&sys_mem_start_addr+&phycp_tcm_core0_offset)++(&phycp_tcm_core0_len-1)
+      d.save.binary "&_global_working_dir\phycp_tcm_core1.bin" (&sys_mem_start_addr+&phycp_tcm_core1_offset)++(&phycp_tcm_core1_len-1)
+      d.load.Binary "&_global_working_dir\phycp_tcm_core0.bin" &phycp_tcm_core0_address /NoClear
+      d.load.Binary "&_global_working_dir\phycp_tcm_core1.bin" &phycp_tcm_core1_address /NoClear
+
+      DEL "&_global_working_dir\phycp_tcm_core0.bin"
+      DEL "&_global_working_dir\phycp_tcm_core1.bin"
+    )
+
+    local &phycp_llram_offset
+    local &phycp_llram_len
+    local &phycp_llram_address
+
+    ; PHYCP_LLRAM
+    &phycp_llram_offset=0x1D041000
+    &phycp_llram_len=0x00200000
+    &phycp_llram_address=0x41000000
+
+    d.save.binary "&_global_working_dir\phycp_llram.bin" (&sys_mem_start_addr+&phycp_llram_offset)++(&phycp_llram_len-1)
+    d.load.Binary "&_global_working_dir\phycp_llram.bin" &phycp_llram_address /NoClear
+
+    DEL "&_global_working_dir\phycp_llram.bin"
+  )
+)
+
+; Recover stack
+do "&curr_script_dir\_arm_recover_v4_stack.cmm"
+
+CMM_END:
+
+if (&err!=0)
+(
+  enddo false()
+)
+else
+(
+  enddo true()
+)
+
+

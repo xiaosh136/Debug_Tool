@@ -1,0 +1,63 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Version Component                                                                                     ;;
+;;                                                                                                        ;;
+;;    Version : get remote & current version                                                              ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+global &_global_remote_version &_global_curr_version
+&_global_remote_version=""
+&_global_curr_version=""
+
+&curr_script_dir=os.ppd()
+
+global &_global_remote_url
+&_global_remote_url="http://shsvn02/svn/Tools/trunk/Tools/PLY-T32Scripts"
+os.command python "&curr_script_dir/_version_get_remote_ver.py" "&_global_remote_url" "&curr_script_dir/remote_version.xml" "&curr_script_dir/remote_version.txt"
+wait 1.s
+
+if os.file("&curr_script_dir/remote_version.txt")
+(
+  open #1 "&curr_script_dir/remote_version.txt" /read
+  read #1 %line &_global_remote_version
+  close #1
+)
+if os.file("&curr_script_dir/remote_version.xml")
+(
+  del "&curr_script_dir/remote_version.xml"
+)
+if os.file("&curr_script_dir/remote_version.txt")
+(
+  del "&curr_script_dir/remote_version.txt"
+)
+
+if os.file("&curr_script_dir/curr_version.txt")
+(
+  open #1 "&curr_script_dir/curr_version.txt" /read
+  read #1 %line &_global_curr_version
+  close #1
+)
+
+enddo

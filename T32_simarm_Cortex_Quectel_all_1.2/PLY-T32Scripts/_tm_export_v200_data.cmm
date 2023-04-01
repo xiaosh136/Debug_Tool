@@ -1,0 +1,213 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  TM Component                                                                                          ;;
+;;                                                                                                        ;;
+;;    Task Monitor : Export the v2.20 version block data to the host file                                 ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+entry &caller_point_index &last_ts &out
+
+; remove \"\"
+&caller_point_index=&caller_point_index
+
+&TM_IDLE_REQ=0x10
+&TM_TASK_REQ=0x20
+&TM_ENTER_INT_REQ=0x30
+&TM_LEAVE_INT_REQ=0x40
+&TM_ENTER_SLEEP_REQ=0x50
+&TM_LEAVE_SLEEP_REQ=0x60
+&TM_TEST_POINT_REQ=0x70
+&TM_ENTER_FIQ=0x80
+&TM_LEAVE_FIQ=0x90
+
+&POWERMODE_CORESTOP=0x0
+&POWERMODE_LIGHTSLEEP=0x1
+&POWERMODE_DEEPSLEEP=0x2
+&POWERMODE_SHUTDOWN=0x3
+
+&diff_time = 0
+&last_ts = &last_ts
+
+global &_global_tm_block_data_point_cnt
+&_global_tm_block_data_point_cnt=0
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Start ...                                                                                             ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+&id=v.value(tm_info.point_tab[&caller_point_index].id)
+&time=v.value(tm_info.point_tab[&caller_point_index].time)
+if (v.value(&last_ts)!=v.value("0x0"))
+  &diff_time=&time-&last_ts
+&last_ts=&time
+if (v.value(&id)==&TM_IDLE_REQ)
+(
+  &_global_tm_block_data_point_cnt=&_global_tm_block_data_point_cnt+1
+  print "IDLE       : " format.decimal(0, v.value(&time)) "(" format.decimal(5, v.value(&diff_time)) ");     Sleep mode   0x0"
+)
+else if (v.value(&id)==&TM_TASK_REQ)
+(
+  &_global_tm_block_data_point_cnt=&_global_tm_block_data_point_cnt+1
+  &pointer=v.value(tm_info.point_tab[&caller_point_index].pointer)
+  &name=v.value(((TX_THREAD *)&pointer)->tx_thread_name)
+  &name=data.string(d:&name)
+  print "TASK       : " format.decimal(0, v.value(&time)) "(" format.decimal(5, v.value(&diff_time)) ");     Task         0x" v.value(&pointer) "(&name)"
+)
+else if (v.value(&id)==&TM_ENTER_INT_REQ)
+(
+  &_global_tm_block_data_point_cnt=&_global_tm_block_data_point_cnt+1
+  &pointer=v.value(tm_info.point_tab[&caller_point_index].pointer)
+  &return_addr=v.value(tm_info.point_tab[&caller_point_index].return_addr)
+  &irq_id=&pointer
+  &irq_name=""
+  if (v.value(&irq_id)<v.value("0x20"))
+  (
+    if (v.value(&irq_id)==v.value("0"))
+    (
+      &irq_name="IPI_RESCHEDULE"
+    )
+    else if (v.value(&irq_id)==v.value("1"))
+    (
+      &irq_name="IPI_CALL_FUNC"
+    )
+    else if (v.value(&irq_id)==v.value("2"))
+    (
+      &irq_name="IPI_STOP"
+    )
+    else if (v.value(&irq_id)==v.value("3"))
+    (
+      &irq_name="IPI_TIMER"
+    )
+    else if (v.value(&irq_id)==v.value("4"))
+    (
+      &irq_name="IPI_IRQ_WORK"
+    )
+    else if (v.value(&irq_id)==v.value("5"))
+    (
+      &irq_name="IPI_WAKEUP"
+    )
+	else
+	(
+	  do "&curr_script_dir\_tm_parse_irq_name.cmm" &irq_id
+	)
+  )
+  else if (v.value(&irq_id)>=v.value("0x20")&&v.value(&irq_id)<v.value(tm_info.head.nrof_irq+0x20))
+  (
+    ;&i=v.value(&irq_id-0x20)
+    ;&irq_name=v.value(tm_info.irq_tab[&i])
+    ;&irq_name=data.string(d:&irq_name)
+	do "&curr_script_dir\_tm_parse_irq_name.cmm" &irq_id
+  )
+  else if (v.value(&irq_id)>=v.value("0x20"))
+  (
+    if (v.value(&irq_id)>=v.value("0x400"))
+    (
+      ;&irq_id=v.value(&irq_id-0x400)
+      local &i
+      &i=0
+IRQ_LOOP:
+      if (v.value(&irq_id&0x1)!=v.value("1"))
+      (
+       &i=&i+1
+       &irq_id=v.value(&irq_id>>1)
+       goto IRQ_LOOP
+      )
+      do "&curr_script_dir\_tm_parse_irq_name.cmm" &i
+    )
+  )
+  else
+  (
+    &irq_name="unknown"
+  )
+  print "ENTER IRQ  : " format.decimal(0, v.value(&time)) "(" format.decimal(5, v.value(&diff_time)) ");     Irq status   0x" v.value(&pointer) "(&irq_name)" "; Return Addr 0x" v.value(&return_addr)
+)
+else if (v.value(&id)==&TM_LEAVE_INT_REQ)
+(
+  &_global_tm_block_data_point_cnt=&_global_tm_block_data_point_cnt+1
+  print "LEAVE IRQ  : " format.decimal(0, v.value(&time)) "(" format.decimal(5, v.value(&diff_time)) ");"
+)
+else if (v.value(&id)==&TM_ENTER_SLEEP_REQ)
+(
+  &_global_tm_block_data_point_cnt=&_global_tm_block_data_point_cnt+1
+  &pointer=v.value(tm_info.point_tab[&caller_point_index].pointer)
+  print "ENTER SLEEP: " format.decimal(0, v.value(&time)) "(" format.decimal(5, v.value(&diff_time)) ");     AON time     " format.decimal(0,v.value(&pointer)) "; "
+)
+else if (v.value(&id)==&TM_LEAVE_SLEEP_REQ)
+(
+  &_global_tm_block_data_point_cnt=&_global_tm_block_data_point_cnt+1
+  &pointer=v.value(tm_info.point_tab[&caller_point_index].pointer)
+  print "LEAVE SLEEP: " format.decimal(0, v.value(&time)) "(" format.decimal(5, v.value(&diff_time)) ");     AON time     " format.decimal(0,v.value(&pointer)) "; "
+)
+else if (v.value(&id)==&TM_TEST_POINT_REQ)
+(
+  &_global_tm_block_data_point_cnt=&_global_tm_block_data_point_cnt+1
+  &pointer=v.value(tm_info.point_tab[&caller_point_index].pointer)
+  &return_addr=v.value(tm_info.point_tab[&caller_point_index].return_addr)
+  if (&return_addr==0x1883E)
+  (
+    &pointer_comments=""
+    if (&pointer==&POWERMODE_CORESTOP)
+    (
+      &pointer_comments="CORESTOP"
+    )
+    else if (&pointer==&POWERMODE_LIGHTSLEEP)
+    (
+      &pointer_comments="LIGHTSLEEP"
+    )
+    else if (&pointer==&POWERMODE_DEEPSLEEP)
+    (
+      &pointer_comments="DEEPSLEEP"
+    )
+    else if (&pointer==&POWERMODE_SHUTDOWN)
+    (
+      &pointer_comments="SHUTDOWN"
+    )
+    print "TEST POINT : " format.decimal(0, v.value(&time)) "(" format.decimal(5, v.value(&diff_time)) ");                  0x" v.value(&pointer) " &pointer_comments,   0x" v.value(&return_addr)
+  )
+  else
+  (
+    print "TEST POINT : " format.decimal(0, v.value(&time)) "(" format.decimal(5, v.value(&diff_time)) ");                  0x" v.value(&pointer) ",   0x" v.value(&return_addr)
+  )
+)
+else if (v.value(&id)==&TM_ENTER_FIQ)
+(
+  &_global_tm_block_data_point_cnt=&_global_tm_block_data_point_cnt+1
+  &pointer=v.value(tm_info.point_tab[&caller_point_index].pointer)
+  &return_addr=v.value(tm_info.point_tab[&caller_point_index].return_addr)
+  print "ENTER FIQ  : " format.decimal(0, v.value(&time)) "(" format.decimal(5, v.value(&diff_time)) ");     Irq status   0x" v.value(&pointer) "(FIQ)" "; Return Addr 0x" v.value(&return_addr)
+)
+else if (v.value(&id)==&TM_LEAVE_FIQ)
+(
+  &_global_tm_block_data_point_cnt=&_global_tm_block_data_point_cnt+1
+  print "LEAVE FIQ  : " format.decimal(0, v.value(&time)) "(" format.decimal(5, v.value(&diff_time)) ");"
+)
+else
+(
+  goto CMM_END
+)
+
+CMM_END:
+&out = v.value(&time)
+enddo

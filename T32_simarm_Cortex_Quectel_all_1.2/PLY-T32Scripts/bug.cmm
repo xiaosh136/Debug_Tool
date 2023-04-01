@@ -1,0 +1,10 @@
+global &_global_cli_quiet &_global_cli_product &_global_cli_cpu_num &_global_cli_axf &_global_cli_mem &_global_cli_begin_address &_global_cli_working_dir
+
+&_global_cli_quiet=
+&_global_cli_product="0x2"
+&_global_cli_axf="F:\customer\展锐CAT4\200D\MIFI\奈族\新基线\新基线开机死机dump\UMS9117_uis8310_MI_1h10_64M_VSIM_halo.axf"
+&_global_cli_mem="F:\customer\展锐CAT4\200D\MIFI\奈族\新基线\新基线开机死机dump\2023_03_24_12_27_38_790_armlog\2023_03_24_12_27_38_790_armlog\2023_03_24_12_27_38_790_1.mem"
+&_global_cli_working_dir="D:\TOOLS\Debug_Tool\T32_simarm_Cortex_Quectel_all_1.2\PLY-T32Scripts"
+do "D:\TOOLS\Debug_Tool\T32_simarm_Cortex_Quectel_all_1.2\PLY-T32Scripts/_start.cmm"
+do "D:\TOOLS\Debug_Tool\T32_simarm_Cortex_Quectel_all_1.2\PLY-T32Scripts/_auto_analyze_assert.cmm" "D:\TOOLS\Debug_Tool\T32_simarm_Cortex_Quectel_all_1.2\PLY-T32Scripts/a.log"
+;quit

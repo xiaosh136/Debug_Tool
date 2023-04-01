@@ -1,0 +1,135 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  TRACE32 Component                                                                                     ;;
+;;                                                                                                        ;;
+;;    TRACE32 : symbol.info                                                                               ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+global &_global_symbol_attr &_global_symbol_ctype &_global_symbol_type &_global_symbol_source
+entry &caller_file_path &caller_symobl
+
+; remove \"\"
+&caller_file_path=&caller_file_path
+&caller_symobl=&caller_symobl
+
+&_global_symbol_attr=""
+&_global_symbol_ctype=""
+&_global_symbol_type=""
+&_global_symbol_source=""
+
+if (!symbol.exist("&caller_symobl"))
+(
+  goto CMM_END
+)
+
+printer.open "&caller_file_path"
+winprint.symbol.info &caller_symobl
+printer.close
+;winclear top
+
+; analyze file
+&has_module_info=0
+&has_function=0
+&has_variable=0
+&has_type=0
+local &myline
+open #3 "&caller_file_path" /read
+read #3 %line &myline
+while !file.eof(3)
+(
+  if ("&myline"=="module_info")
+  (
+    &has_module_info=1
+  )
+  else if ("&myline"=="function")
+  (
+    &has_function=1
+    &_global_symbol_type="function"
+  )
+  else if ("&myline"=="variable")
+  (
+    &has_variable=1
+    &_global_symbol_type="variable"
+  )
+  else if ("&myline"=="type")
+  (
+    &has_type=1
+    if !file.eof(3)
+    (
+      read #3 %line &myline
+      &_global_symbol_ctype="&myline"
+      if (string.scan("&myline",") (",0)!=-1)
+      (
+        &pos=string.scan("&myline",") (",0)
+        &_global_symbol_ctype=string.mid("&myline",0,&pos+1)
+        &pos=&pos+2
+        &end_pos=string.length("&myline")
+        &left_ctype=string.mid("&myline",&pos,&end_pos-&pos)
+        if (string.scan("&left_ctype","(function returns ",0)!=-1)
+        (
+        )
+        else if (string.scan("&left_ctype","(pointer to ",0)!=-1)
+        (
+        )
+        else if (string.scan("&left_ctype","(typedef of struct)",0)!=-1)
+        (
+          ; typedef of unamed struct
+        )
+        else if (string.scan("&left_ctype","(typedef of ",0)!=-1)
+        (
+        )
+      )
+    )
+  )
+  else if (string.scan("&myline","attr:",0)!=-1)
+  (
+    ; ARM, THUMB, DATA
+    &pos=string.scan("&myline","attr:",0)
+    &pos=&pos+5
+    &end_pos=string.length("&myline")
+    &_global_symbol_attr=string.mid("&myline",&pos,&end_pos-&pos)
+    &_global_symbol_attr=string.trim("&_global_symbol_attr")
+  )
+  else if ((string.scan("&myline","source:",0)!=-1)&&(&has_module_info==1))
+  (
+    &pos=string.scan("&myline","source:",0)
+    &pos=&pos+7
+    &end_pos=string.length("&myline")
+    &_global_symbol_source=string.mid("&myline",&pos,&end_pos-&pos)
+    &_global_symbol_source=string.trim("&_global_symbol_source")
+    if (string.scan("&_global_symbol_source","MS_Code\",0)!=-1)
+    (
+      &pos=string.scan("&_global_symbol_source","MS_Code\",0)
+      &pos=&pos+8
+      &end_pos=string.length("&_global_symbol_source")
+      &_global_symbol_source=string.mid("&_global_symbol_source",&pos,&end_pos-&pos)
+    )
+  )
+  read #3 %line &myline
+)
+close #3
+
+CMM_END:
+enddo

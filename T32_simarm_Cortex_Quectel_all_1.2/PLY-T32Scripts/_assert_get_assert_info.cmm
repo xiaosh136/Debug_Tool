@@ -1,0 +1,207 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Assert Component                                                                                      ;;
+;;                                                                                                        ;;
+;;    Assert: get assert info                                                                             ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+global &_global_assert_info
+global &_global_assert_core_num
+global &_global_assert_core_name
+global &_global_assert_core_index
+global &_global_assert_root_core_name
+global &_global_assert_root_core_index
+&_global_assert_info=""
+&_global_assert_core_num=1
+&_global_assert_core_name=""
+&_global_assert_core_index=0
+&_global_assert_root_core_name=""
+&_global_assert_root_core_index=0
+
+; V3 ? V4?
+if (symbol.exist(modem_assert_info)&&(symbol.exist(LOG_magicHeader)))
+(
+  &modem_assert_info_cnt=v.value(sizeof(modem_assert_info)/sizeof(modem_assert_info[0]))
+  &core_name=data.string(d:v.value(LOG_magicHeader.coreName))
+  &RUNNING_E=v.value("0")
+  &ACTIVE_ASSERT_E=v.value("1")
+  &ASSERT_BY_MBOX_E=v.value("2")
+  &ASSERT_BY_OTHER_CORE_E=v.value("3")
+  &DSP_HUNGING_E=v.value("4")
+  
+  local &core_nums
+  local &assert_info_offset
+  
+  ; active assert core?
+  if (&modem_assert_info_cnt==4)
+  (
+    if (v.value(modem_assert_info[0].assert_debug_info[0].assert_info.status)==&ACTIVE_ASSERT_E)
+    (
+      &_global_assert_root_core_name="PS"
+      &_global_assert_root_core_index=0
+    )
+    else if (v.value(modem_assert_info[1].assert_debug_info[0].assert_info.status)==&ACTIVE_ASSERT_E)
+    (
+      &_global_assert_root_core_name="PS"
+      &_global_assert_root_core_index=1
+    )
+    else if (v.value(modem_assert_info[2].assert_debug_info[0].assert_info.status)==&ACTIVE_ASSERT_E)
+    (
+      &_global_assert_root_core_name="PHY"
+      &_global_assert_root_core_index=0
+    )
+    else if (v.value(modem_assert_info[3].assert_debug_info[0].assert_info.status)==&ACTIVE_ASSERT_E)
+    (
+      &_global_assert_root_core_name="PHY"
+      &_global_assert_root_core_index=1
+    )
+    else
+    (
+    )
+  )
+  else
+  (
+    if (v.value(modem_assert_info[0].assert_debug_info[0].assert_info.status)==&ACTIVE_ASSERT_E)
+    (
+      &_global_assert_root_core_name="PS"
+      &_global_assert_root_core_index=0
+    )
+    else if (v.value(modem_assert_info[1].assert_debug_info[0].assert_info.status)==&ACTIVE_ASSERT_E)
+    (
+      &_global_assert_root_core_name="PS"
+      &_global_assert_root_core_index=1
+    )
+    else if (v.value(modem_assert_info[2].assert_debug_info[0].assert_info.status)==&ACTIVE_ASSERT_E)
+    (
+      &_global_assert_root_core_name="V3-PHY"
+      &_global_assert_root_core_index=0
+    )
+    else if (v.value(modem_assert_info[3].assert_debug_info[0].assert_info.status)==&ACTIVE_ASSERT_E)
+    (
+      &_global_assert_root_core_name="NR"
+      &_global_assert_root_core_index=0
+    )
+    else if (v.value(modem_assert_info[4].assert_debug_info[0].assert_info.status)==&ACTIVE_ASSERT_E)
+    (
+      &_global_assert_root_core_name="NR"
+      &_global_assert_root_core_index=1
+    )
+    else
+    (
+    )
+  )
+  
+  ; current core
+  &core_name=data.string(d:v.value(LOG_magicHeader.coreName))
+  ;print "core_name: &core_name"
+  
+  if ("&core_name"=="PS")
+  (
+    &_global_assert_core_num=v.value(sizeof(_tx_thread_current_ptr)/sizeof(void *))
+    &_global_assert_core_name="&core_name"
+    if (v.value(modem_assert_info[1].assert_debug_info[0].assert_info.status)==&ACTIVE_ASSERT_E)
+    (
+      &_global_assert_core_index=1
+      &_global_assert_info=v.value(modem_assert_info[1].assert_debug_info[0].assert_info.assert_info_buf)
+      &_global_assert_info=data.string(d:&_global_assert_info)
+    )
+    else
+    (
+      &_global_assert_core_index=0
+      &_global_assert_info=v.value(modem_assert_info[0].assert_debug_info[0].assert_info.assert_info_buf)
+      &_global_assert_info=data.string(d:&_global_assert_info)
+    )
+  )
+  else if (("&core_name"=="V3-PHY")||("&core_name"=="PHY"))&&(&modem_assert_info_cnt==4)
+  (
+    &_global_assert_core_num=v.value(sizeof(_tx_thread_current_ptr)/sizeof(void *))
+    &_global_assert_core_name="&core_name"
+    if (v.value(modem_assert_info[3].assert_debug_info[0].assert_info.status)==&ACTIVE_ASSERT_E)
+    (
+      &_global_assert_core_index=1
+      &_global_assert_info=v.value(modem_assert_info[3].assert_debug_info[0].assert_info.assert_info_buf)
+      &_global_assert_info=data.string(d:&_global_assert_info)
+    )
+    else
+    (
+      &_global_assert_core_index=0
+      &_global_assert_info=v.value(modem_assert_info[2].assert_debug_info[0].assert_info.assert_info_buf)
+      &_global_assert_info=data.string(d:&_global_assert_info)
+    )
+  )
+  else if ("&core_name"=="V3-PHY")
+  (
+    &_global_assert_core_num=v.value(sizeof(_tx_thread_current_ptr)/sizeof(void *))
+    &_global_assert_core_name="&core_name"
+    &_global_assert_core_index=0
+    &_global_assert_info=v.value(modem_assert_info[2].assert_debug_info[0].assert_info.assert_info_buf)
+    &_global_assert_info=data.string(d:&_global_assert_info)
+  )
+  else if ("&core_name"=="NR")
+  (
+    &_global_assert_core_num=v.value(sizeof(_tx_thread_current_ptr)/sizeof(void *))
+    &_global_assert_core_name="&core_name"
+    if (v.value(modem_assert_info[4].assert_debug_info[0].assert_info.status)==&ACTIVE_ASSERT_E)
+    (
+      &_global_assert_core_index=1
+      &_global_assert_info=v.value(modem_assert_info[4].assert_debug_info[0].assert_info.assert_info_buf)
+      &_global_assert_info=data.string(d:&_global_assert_info)
+    )
+    else
+    (
+      &_global_assert_core_index=0
+      &_global_assert_info=v.value(modem_assert_info[3].assert_debug_info[0].assert_info.assert_info_buf)
+      &_global_assert_info=data.string(d:&_global_assert_info)
+    )
+  )
+  else
+  (
+  )
+)
+else if (symbol.exist(assert_info_buf))
+(
+  &_global_assert_info=v.value(assert_info_buf)
+  &_global_assert_info=data.string(d:&_global_assert_info)
+  &_global_assert_info="&_global_assert_info"
+  &_global_assert_core_num=v.value(sizeof(_tx_thread_current_ptr)/sizeof(void *))
+  &_global_assert_core_name=""
+  &_global_assert_core_index=0
+  &_global_assert_root_core_name=""
+  &_global_assert_root_core_index=0
+)
+else if (symbol.exist(s_assert_info_ptr))
+(
+  &_global_assert_info=v.value(s_assert_info_ptr)
+  &_global_assert_info=data.string(d:&_global_assert_info)
+  &_global_assert_info="&_global_assert_info"
+  &_global_assert_core_num=v.value(sizeof(_tx_thread_current_ptr)/sizeof(void *))
+  &_global_assert_core_name=""
+  &_global_assert_core_index=0
+  &_global_assert_root_core_name=""
+  &_global_assert_root_core_index=0
+)
+
+enddo

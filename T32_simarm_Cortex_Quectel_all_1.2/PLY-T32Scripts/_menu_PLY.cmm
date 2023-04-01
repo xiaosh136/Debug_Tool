@@ -1,0 +1,102 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Menu Component                                                                                        ;;
+;;                                                                                                        ;;
+;;    PLY Menu : ALL                                                                                      ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Set the PLY script directory
+global &_global_PLY_script_dir
+&_global_PLY_script_dir=os.ppd()
+&curr_script_dir=os.ppd()
+
+; DO "~~/demo/menu/internal_icons.cmm"
+task.config "&curr_script_dir\threadx.t32"
+menu.reprogram "&curr_script_dir\threadx.men"
+
+do "&curr_script_dir/_menu_PLY_arm.cmm"
+do "&curr_script_dir/_menu_PLY_tx.cmm"
+do "&curr_script_dir/_menu_PLY_tm.cmm"
+do "&curr_script_dir/_menu_PLY_osa.cmm"
+do "&curr_script_dir/_menu_PLY_stat.cmm"
+do "&curr_script_dir/_menu_PLY_auto.cmm"
+do "&curr_script_dir/_menu_PLY_log.cmm"
+do "&curr_script_dir/_menu_PLY_setting.cmm"
+do "&curr_script_dir/_menu_PLY_support.cmm"
+do "&curr_script_dir/_menu_PLY_toolbar.cmm"
+
+global &_global_remote_version &_global_curr_version
+if ("&_global_remote_version"!=""&&"&_global_remote_version"!="&_global_curr_version")
+(
+  MENU.ReProgram
+  (
+    ADD
+    MENU
+    (
+      POPUP "[[Pizer Love You!]"
+      (
+        BEFORE "V3-LOG"
+        SEPARATOR
+        BEFORE "Settings"
+        SEPARATOR
+        AFTER "Support"
+        SEPARATOR
+        MENUITEM "[:advdown]Upgrade"
+        (
+          do "&_global_PLY_script_dir\_version_upgrade.cmm"
+        )
+        MENUITEM "[:t32]Start"
+        (
+          do "&_global_PLY_script_dir\_start.cmm"
+        )
+      )
+    )
+  )
+)
+else
+(
+  MENU.ReProgram
+  (
+    ADD
+    MENU
+    (
+      POPUP "[[Pizer Love You!]"
+      (
+        BEFORE "V3-LOG"
+        SEPARATOR
+        BEFORE "Settings"
+        SEPARATOR
+        AFTER "Support"
+        SEPARATOR
+        MENUITEM "[:t32]Start"
+        (
+          do "&_global_PLY_script_dir\_start.cmm"
+        )
+      )
+    )
+  )
+)
+
+enddo

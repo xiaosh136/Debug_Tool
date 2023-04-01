@@ -1,0 +1,92 @@
+; --------------------------------------------------------------------------------
+; @Title: Script File to load ETB raw data in the TRACE32 Simulator
+; @Description: 
+;   This script loads the ETB raw data in the TRACE32 Simulator.
+;   You need to edit the script to setup exactely the same ETM
+;   configuration used when the trace data has been generated.
+;   Otherwhise the raw data cannot be correctly decoded.
+; @Keywords: ETB, raw, simulator, trace
+; @Author: -
+; @Copyright: (C) 1989-2014 Lauterbach GmbH, licensed for use with TRACE32(R) only
+; --------------------------------------------------------------------------------
+; $Id: etb_sim_import.cmm 6904 2014-04-21 15:16:07Z kjmal $
+
+global &_global_export_dir
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+
+; System Settings
+
+; SYStem.CPU *
+  SYStem.CPU CortexR5
+; set any address here to enable the ETM in TRACE32
+  SYStem.CONFIG ETMBASE 1000
+  SYStem.CONFIG TPIU.Base 2000
+  SYStem.Up
+  
+; Load the target code
+; Data.LOAD.Elf *.axf
+  Data.LOAD "&export_dir/*.axf"
+; Load the memory file
+; &mem_file_path="E:\Roc1+Orca\etb?¡§o¡§?a\mycatch\2020_01_10_17_18_35_0681.mem"
+; enter &mem_file_path  
+  DIALOG.FILE "&export_dir/*.mem"
+  ENTRY &mem_file_path
+    
+
+;#define MEM_CFG_V3PHY_MEM_BASE_ADDR  (0x99000000)
+;#define MEM_PHY_BASE_ADDR            (MEM_CFG_V3PHY_MEM_BASE_ADDR)
+;#define MEM_TCM_START_ADDR           (MEM_PHY_BASE_ADDR - 0x00020000)
+;Load Region LOAD_KERNEL_IMAGE (Base: 0x99000000, Size: 0x0040ed38, Max: 0x00f00000, ABSOLUTE, COMPRESSED[0x003ec070])
+;Execution Region MEM_INFO_AREA (Base: 0x99000000, Size: 0x00000600, Max: 0x00000600, ABSOLUTE)
+;Execution Region EXEC_KERNEL_IMAGE0 (Base: 0x99000600, Size: 0x00339280, Max: 0x003ffa00, ABSOLUTE)
+;Execution Region TCM_DATA (Base: 0x98fe0000, Size: 0x00002698, Max: 0x00002800, ABSOLUTE)
+;Execution Region TCM_CODE (Base: 0x98fe2800, Size: 0x0001d6fc, Max: 0x0001d800, ABSOLUTE)
+
+  &EXEC_KERNEL_IMAGE0_Base=v.value(&Image$$EXEC_KERNEL_IMAGE0$$Base)
+  &MEM_INFO_AREA_Base=&EXEC_KERNEL_IMAGE0_Base-0x600
+  &MEM_PHY_BASE_ADDR=&MEM_INFO_AREA_Base
+  &MEM_TCM_START_ADDR=v.value(&MEM_PHY_BASE_ADDR-0x00020000)
+  &TCM_DATA_Base=&MEM_TCM_START_ADDR
+  &TCM_DATA_Size=0x00002800
+  &TCM_CODE_Base=v.value(&TCM_DATA_Base+&TCM_DATA_Size)
+  &TCM_CODE_Size=v.value(0x00020000-&TCM_DATA_Size)
+
+  &v3phy_atcm_address=&TCM_DATA_Base
+  &v3phy_btcm_address=v.value(&TCM_DATA_Base+0x10000)
+  
+  Data.LOAD.binary &mem_file_path 0x88000000++0x15000000 /SKIP 0x00000000 /noclear
+; Data.LOAD.binary &mem_file_path 0x00000000++0x00001000 /SKIP 0x15000000 /noclear    
+; Data.LOAD.binary &mem_file_path 0x60004000++0x00001000 /SKIP 0x15001000 /noclear
+  Data.LOAD.binary &mem_file_path 0x00000000++0x00001000 /SKIP 0x15001000 /noclear
+  Data.LOAD.binary &mem_file_path 0x54100000++0x00060000 /SKIP 0x15003000 /noclear
+  Data.LOAD.binary &mem_file_path 0x48000000++0x00140000 /SKIP 0x15063000 /noclear
+; Data.LOAD.binary &mem_file_path 0x9AFE0000++0x00010000 /SKIP 0x151A3000 /noclear
+; Data.LOAD.binary &mem_file_path 0x9AFF0000++0x00010000 /SKIP 0x151B3000 /noclear
+  Data.LOAD.binary &mem_file_path &v3phy_atcm_address++0x00010000 /SKIP 0x151A3000 /noclear
+  Data.LOAD.binary &mem_file_path &v3phy_btcm_address++0x00010000 /SKIP 0x151B3000 /noclear
+  Data.LOAD.binary &mem_file_path 0x87800000++0x00800000 /SKIP 0x151C3000 /noclear  
+  Data.LOAD.binary &mem_file_path 0x924C7EE4++0x00004000 /SKIP 0x159C3000 /noclear
+  Data.LOAD.binary &mem_file_path 0x63300000++0x00010000 /SKIP 0x159C7000 /noclear
+  Data.LOAD.binary &mem_file_path 0x55910000++0x000001FC /SKIP 0x159D7008 /noclear
+  
+; ETM Settings, Please note that these settings must match the used ETM settings
+; when recording the trace. Otherwhise, the displayed trace here could contain 
+; erros.
+  ETM.PortSize 32.
+  ETM.ContextID OFF
+; ETM.PortMode  Normal
+  tpiu.portmode wrapped  
+  ETM.DataTrace OFF
+  
+; Import trace data
+  LA.Mode FLOWTRACE ON
+; LA.IMPORT.ETB *.log
+  LA.IMPORT.ETB "&export_dir/*.bin"
+  LA.List
+  
+  ENDDO
+  

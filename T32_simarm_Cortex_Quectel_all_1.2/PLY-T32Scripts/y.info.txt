@@ -1,0 +1,28 @@
+B::symbol.info_LTE_Layer1_adx_thread_entry
+address_info
+attr: THUMB
+F:    R13+00000000
+frame:RET:R14 CFA:R13+0x0 R0:used R1:used R2:used R3:used R4:- R5:- R6:- R7:- R8:- R9:- R10:- R11:- R12:used R14:- D0:used D1:used D2:used D3:used D4:used D5:used D6:used D7:used D8:- D9:- D10:- D11:- D12:- D13:- D14:- D15:-
+
+function
+\\UMS9117_uis8310_MI_1h10_64M_VSIM_halo\layer1_adx_main\LTE_Layer1_adx_thread_entry
+---
+     P:8124A9DE--8124AC25     modul-local static
+
+function_info
+* . push: [] use: [R0,R1,R2,R3]
+---
+epilog:   none
+exit:     none
+
+module_info
+language: ELF-C
+producer: Component: ARM Compiler 5.06 update 6 (build 750) Tool: armcc [4d3637]
+source:   D:\jenkins\workspace\s3_2_139221\CD\MS_Code\PS\stack\las\adx\source\c\layer1_adx_main.c
+
+type
+(void ()) (function returns void)
+---
+(void) void
+
+

@@ -1,0 +1,17 @@
+
+; product: 
+;   0: ORCA
+;   1: SHARKLE/SHARKL5/SHARKL5PRO
+;   2: W317/T117
+
+global &_global_cli_quiet &_global_cli_product &_global_cli_cpu_num &_global_cli_axf &_global_cli_mem &_global_cli_begin_address &_global_cli_working_dir
+
+&_global_cli_quiet="1"
+&_global_cli_product="0"
+&_global_cli_axf="D:\tmp\1404339\SC9600_Orca_PSCP_modem_modem.axf"
+&_global_cli_mem="D:\tmp\1404339\arm\arm_1.mem"
+&_global_cli_working_dir="D:\tmp\1404339"
+
+do "F:\tools\T32-scripts\PLY-T32Scripts\_start.cmm"
+do "F:\tools\T32-scripts\PLY-T32Scripts\_auto_analyze_assert.cmm" "D:\tmp\1404339\a.log"
+

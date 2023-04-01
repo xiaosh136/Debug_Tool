@@ -1,0 +1,73 @@
+LOCAL &CUR_DIR
+LOCAL &soc_funnel_value &print_string &dir_path
+
+&CUR_DIR=OS.PPD()
+&header_offset=0x200
+&soc_funnel_offset=0x10+3*2*0x4
+
+
+SYSTEM.CPU CortexR8
+SYStem.Up
+
+;plist
+;stop
+
+
+
+
+AREA.CREATE BigArea 200 500
+AREA.select BigArea
+area.view BigArea
+
+global &dir_path
+
+print "Please input the working directory [&dir_path]: "
+enter &dir_path
+
+DIALOG.FILE "&dir_path\*.bin"
+ENTRY &etb_bin_file_path
+d.load.b "&etb_bin_file_path" 0x0
+
+
+
+
+&soc_funnel_value=d.long(C:&soc_funnel_offset)
+
+&funnel_port=(&soc_funnel_value&0xFF)
+
+IF (&funnel_port==0x1)
+(
+		&print_string="PSCP -> Soc_ETB"
+)
+ELSE IF (&funnel_port==0x3)
+(
+		&print_string="PHYCP -> Soc_ETB"
+)
+ELSE IF (&funnel_port==0x0)
+(
+		&print_string="AP -> Soc_ETB"
+)
+ELSE
+(
+		&print_string="NULL -> Soc_ETB"
+)
+PRINT "&print_string"
+DIALOG.MESSAGE "&print_string"
+
+;PRinTer.FILE &CUR_DIR\multi_etb.txt
+
+;PRINT "helo"
+
+;PRINT %COLOR.BLUE "Start file name: " %COLOR.RED PRINTER.FILENAME()
+
+;WinPRT
+
+;ENDDO
+
+d.save.b &dir_path\soc_etb.bin &header_offset++0x7FFF
+d.save.b &dir_path\pscp_core0_etb.bin (&header_offset+0x8000)++0xFFF
+d.save.b &dir_path\pscp_core1_etb.bin (&header_offset+0x9000)++0xFFF
+d.save.b &dir_path\phycp_core0_etb.bin (&header_offset+0xA000)++0xFFF
+d.save.b &dir_path\phycp_core1_etb.bin (&header_offset+0xB000)++0xFFF
+
+ENDDO

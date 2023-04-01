@@ -1,0 +1,127 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  TM Component                                                                                          ;;
+;;                                                                                                        ;;
+;;    Task Monitor : Show the version                                                                     ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; Create logging output window
+area.create show_tm_version_win 200. 500.
+area.select show_tm_version_win
+area.view show_tm_version_win
+
+;PMACRO.list
+local &err
+&err=0
+
+global &_global_export_dir
+
+&BIT_0=0x00000001
+&BIT_1=0x00000002
+&BIT_2=0x00000004
+&BIT_3=0x00000008
+&BIT_4=0x00000010
+&BIT_5=0x00000020
+&BIT_6=0x00000040
+&BIT_7=0x00000080
+&BIT_8=0x00000100
+
+&TM_IDLE_MASK=&BIT_0
+&TM_TASK_MASK=&BIT_1
+&TM_INT_MASK=&BIT_2
+&TM_SLEEP_MASK=&BIT_3
+&TM_TP_MASK=&BIT_4
+&TM_FIQ_MASK=&BIT_5
+
+&TM_TP_DISABLE_ALL_MASK=0x00000000
+&TM_TP_ENABLE_ALL_MASK=0xFFFFFFFF
+&TM_TP_MIN_SYS_MASK=v.value(&TM_TASK_MASK+&TM_INT_MASK+&TM_SLEEP_MASK+&TM_FIQ_MASK)
+&TM_TP_NORMAL_SYS_MASK=v.value(&TM_IDLE_MASK+&TM_TASK_MASK+&TM_INT_MASK+&TM_SLEEP_MASK+&TM_FIQ_MASK)
+&TM_TP_DEFAULT_MASK=v.value(&TM_TP_NORMAL_SYS_MASK+&TM_TP_MASK)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Start ...                                                                                             ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+if !(symbol.exist(tm_info))
+(
+  &err=1
+  print "Error: `tm_info' does not exist. EXIT script"
+  goto CMM_END
+)
+
+&name=v.value(tm_info.head.magic)
+&name=data.string(d:&name)
+&len=string.length("&name")
+&name=string.mid("&name", 0, v.value(&len-1))
+print "Task Monitor Version: &name"
+
+if ("&name"=="TASKMONITORV2.20")
+(
+  print "  Cpu Number        : " format.decimal(0, v.value(tm_info.head.cpu_num))
+  print "  Blocks Counter    : " format.decimal(0, v.value(tm_info.head.blocks_cnt))
+  print "  Block Data Size   : " format.decimal(0, v.value(tm_info.head.block_data_size))
+  if (symbol.exist(tm_pt_mask))
+  (
+    &idle_enabled="Disabled"
+    if (v.value(tm_pt_mask&(&TM_IDLE_MASK))==&TM_IDLE_MASK)
+    (
+      &idle_enabled="Enabled"
+    )
+    &task_enabled="Disabled"
+    if (v.value(tm_pt_mask&(&TM_TASK_MASK))==&TM_TASK_MASK)
+    (
+      &task_enabled="Enabled"
+    )
+    &irq_enabled="Disabled"
+    if (v.value(tm_pt_mask&(&TM_INT_MASK))==&TM_INT_MASK)
+    (
+      &irq_enabled="Enabled"
+    )
+    &sleep_enabled="Disabled"
+    if (v.value(tm_pt_mask&(&TM_SLEEP_MASK))==&TM_SLEEP_MASK)
+    (
+      &sleep_enabled="Enabled"
+    )
+    &fiq_enabled="Disabled"
+    if (v.value(tm_pt_mask&(&TM_FIQ_MASK))==&TM_FIQ_MASK)
+    (
+      &fiq_enabled="Enabled"
+    )
+    print "  The TM switch settings: "
+    print "    tm_pt_mask=0x" format.hex(0,v.value(tm_pt_mask)) ", tm_pt_bkgnd_mask=0x" format.hex(0,v.value(tm_pt_bkgnd_mask))
+    print "    IDLE:&idle_enabled, TASK:&task_enabled, IRQ:&irq_enabled, SLEEP:&sleep_enabled"
+    if (v.value(tm_pt_mask)==&TM_TP_DISABLE_ALL_MASK)
+    (
+      print "    All the TM functions were disabled by application, except "
+      print "    the logging for deep sleep was out of control."
+    )
+  )
+)
+
+CMM_END:
+
+enddo

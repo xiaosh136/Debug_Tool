@@ -1,0 +1,94 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  ARM Component                                                                                         ;;
+;;                                                                                                        ;;
+;;    ARM: Analyze xPSR                                                                                   ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+global &_global_psr_i &_global_psr_f &_global_psr_t &_global_psr_mode &_global_psr_mode_name
+
+entry &caller_psr
+
+; remove \"\"
+&caller_psr=&caller_psr
+
+&_global_psr_i=v.value((&caller_psr&0x80)==0x80?1:0)
+&_global_psr_f=v.value((&caller_psr&0x40)==0x40?1:0)
+&_global_psr_t=v.value((&caller_psr&0x20)==0x20?1:0)
+&_global_psr_mode=(&caller_psr&0x1f)
+&_global_psr_mode_name=""
+
+
+; 0b10000 , user
+if (&_global_psr_mode==0x10)
+(
+  &_global_psr_mode_name="user"
+)
+
+; 0b10001 , fiq
+else if (&_global_psr_mode==0x11)
+(
+  &_global_psr_mode_name="fiq"
+)
+
+; 0b10010 , irq
+else if (&_global_psr_mode==0x12)
+(
+  &_global_psr_mode_name="irq"
+)
+
+; 0b10011 , svc
+else if (&_global_psr_mode==0x13)
+(
+  &_global_psr_mode_name="svc"
+)
+
+; 0b10111 , abort
+else if (&_global_psr_mode==0x17)
+(
+  &_global_psr_mode_name="abort"
+)
+
+; 0b11011 , undef
+else if (&_global_psr_mode==0x1b)
+(
+  &_global_psr_mode_name="undef"
+)
+
+; 0b11111 , sys
+else if (&_global_psr_mode==0x1f)
+(
+  &_global_psr_mode_name="sys"
+)
+
+else
+(
+  &_global_psr_mode_name="unk"
+)
+
+
+CMM_END:
+
+enddo

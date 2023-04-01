@@ -1,0 +1,44 @@
+; --------------------------------------------------------------------------------
+; @Title: Script File to load ETB raw data in the TRACE32 Simulator
+; @Description: 
+;   This script loads the ETB raw data in the TRACE32 Simulator.
+;   You need to edit the script to setup exactely the same ETM
+;   configuration used when the trace data has been generated.
+;   Otherwhise the raw data cannot be correctly decoded.
+; @Keywords: ETB, raw, simulator, trace
+; @Author: -
+; @Copyright: (C) 1989-2014 Lauterbach GmbH, licensed for use with TRACE32(R) only
+; --------------------------------------------------------------------------------
+; $Id: etb_sim_import.cmm 6904 2014-04-21 15:16:07Z kjmal $
+
+
+; System Settings
+
+;	SYStem.CPU *
+	SYStem.CPU CortexR5
+	; set any address here to enable the ETM in TRACE32
+	SYStem.CONFIG ETMBASE 1000
+	SYStem.CONFIG TPIU.Base 2000
+	SYStem.Up
+	
+; Load the target code
+;	Data.LOAD.Elf *.axf
+    Data.LOAD *.axf
+	
+; ETM Settings, Please note that these settings must match the used ETM settings
+; when recording the trace. Otherwhise, the displayed trace here could contain 
+; erros.
+	ETM.PortSize 32.
+	ETM.ContextID OFF
+;	ETM.PortMode  Normal
+	tpiu.portmode wrapped	
+	ETM.DataTrace OFF
+	
+; Import trace data
+	LA.Mode FLOWTRACE ON
+;	LA.IMPORT.ETB *.log
+    LA.IMPORT.ETB *.bin
+	LA.List
+	
+	ENDDO
+	

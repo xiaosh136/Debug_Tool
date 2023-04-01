@@ -1,0 +1,114 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  OSA/TX Component                                                                                      ;;
+;;                                                                                                        ;;
+;;    Memory: List the pool if it's empty for more available allocaiton                                   ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+entry &caller_win
+
+; remove \"\"
+&caller_win=&caller_win
+
+;PMACRO.list
+local &err
+&err=0
+&curr_script_dir=os.ppd()
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Scan full block pools                                                                                 ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+&counter=0
+&ctr_max=v.value(osa_context_g.osa_num_buff_pools_created)
+&ctr=0
+
+CMM_LOOP_SCAN_BLOCK_POOLS:
+
+&pool_id=v.value(osa_context_g.osa_pool_info[&ctr].pool_id)
+&ppool_ctl_block=v.value(&((osa_internal_poolid)&pool_id)->pool_id)
+&tx_block_pool_name=data.string(d:v.value(((osa_os_pool_type *)&ppool_ctl_block)->tx_block_pool_name))
+&tx_block_pool_start=v.value(((osa_os_pool_type *)&ppool_ctl_block)->tx_block_pool_start)
+&tx_block_pool_end=&tx_block_pool_start+v.value(((osa_os_pool_type *)&ppool_ctl_block)->tx_block_pool_size)
+&tx_block_pool_total=format.decimal(8,v.value(((osa_os_pool_type *)&ppool_ctl_block)->tx_block_pool_total))
+&buff_max_alloced=format.decimal(8,v.value(((osa_internal_poolid)&pool_id)->buff_max_alloced))
+&tx_block_pool_available=format.decimal(8,v.value(((osa_os_pool_type *)&ppool_ctl_block)->tx_block_pool_available))
+&tx_block_pool_block_size=format.decimal(8,v.value(((osa_os_pool_type *)&ppool_ctl_block)->tx_block_pool_block_size))
+
+if (v.value("&tx_block_pool_available")==v.value("0"))
+(
+  &counter=&counter+1
+)
+
+&ctr_tmp=&ctr+1
+&ctr=&ctr_tmp
+
+if (&ctr<&ctr_max)
+  goto CMM_LOOP_SCAN_BLOCK_POOLS
+  
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Print full block pools                                                                                ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+if (&counter==0)
+(
+  goto CMM_END
+)
+
+print "===============Full Block Pools==============="
+print "     Pool_Name           Addr        Total_Num  Max_Used   Avail_Num  Unit_Size"
+&ctr_max=v.value(osa_context_g.osa_num_buff_pools_created)
+&ctr=0
+
+CMM_LOOP_PRINT_BLOCK_POOLS:
+
+&pool_id=v.value(osa_context_g.osa_pool_info[&ctr].pool_id)
+&ppool_ctl_block=v.value(&((osa_internal_poolid)&pool_id)->pool_id)
+&tx_block_pool_name=data.string(d:v.value(((osa_os_pool_type *)&ppool_ctl_block)->tx_block_pool_name))
+&tx_block_pool_start=v.value(((osa_os_pool_type *)&ppool_ctl_block)->tx_block_pool_start)
+&tx_block_pool_end=&tx_block_pool_start+v.value(((osa_os_pool_type *)&ppool_ctl_block)->tx_block_pool_size)
+&tx_block_pool_total=format.decimal(8,v.value(((osa_os_pool_type *)&ppool_ctl_block)->tx_block_pool_total))
+&buff_max_alloced=format.decimal(8,v.value(((osa_internal_poolid)&pool_id)->buff_max_alloced))
+&tx_block_pool_available=format.decimal(8,v.value(((osa_os_pool_type *)&ppool_ctl_block)->tx_block_pool_available))
+&tx_block_pool_block_size=format.decimal(8,v.value(((osa_os_pool_type *)&ppool_ctl_block)->tx_block_pool_block_size))
+
+if (v.value("&tx_block_pool_available")==v.value("0"))
+(
+  print "     &(tx_block_pool_name)" " "<<(19.-STRing.LENgth("&(tx_block_pool_name)")) "&(ppool_ctl_block)   &(tx_block_pool_total)  &(buff_max_alloced)    &(tx_block_pool_available) &(tx_block_pool_block_size)"
+)
+
+&ctr_tmp=&ctr+1
+&ctr=&ctr_tmp
+
+if (&ctr<&ctr_max)
+  goto CMM_LOOP_PRINT_BLOCK_POOLS
+  
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  End                                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_END:
+
+enddo

@@ -1,0 +1,178 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Menu Component                                                                                        ;;
+;;                                                                                                        ;;
+;;    About                                                                                               ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; Create about window
+area.create about_win 200. 500.
+area.select about_win
+area.view about_win
+
+print "  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  "
+print "  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            "
+print "  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       "
+print "  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       "
+print ""
+print ""
+print "  Script list:"
+print ""
+print "    Start"
+print "      The starting point to analyze."
+print "      _start.cmm"
+print "        This script is used to startup analyzing."
+print "        Supported products:"
+print "          _product_cfg_cpu_orca.cmm"
+print "          _product_cfg_cpu_sharkle.cmm"
+print "          _product_cfg_cpu_w317.cmm"
+print "          _product_cfg_cpu_manual.cmm"
+print ""
+print "    ARM"
+print "      The submenus related to ARM, such as recovering registers."
+print "        _arm_recover_stack.cmm"
+print "          This script is used to recover the registers from the memory variables."
+print "          It also try back to the previous mode when exception is data abort."
+print "        _arm_recover_v3_stack.cmm"
+print "          This script is used to recover the registers from the memory variables, and only used on the V3 modem."
+print "          It also try back to the previous mode when exception is data abort."
+print "        _arm_show_core_state.cmm"
+print "          This script is used to show the core state (such as: running threads)"
+print "        _arm_analyze_exception_stacks.cmm"
+print "          This script is used to analyze the stack frames of exception modes."
+print "        _arm_analyze_app_stack.cmm"
+print "         This script is used to analyze the stack frame of application thread."
+print "        _arm_dump_code_regions.cmm"
+print "         This script is used to dump the code regions (execution) from memory into host file."
+print "          Sometimes, the code region in DDR (not flash) was demaged by another master, so let's "
+print "          dump and compare it with the binary file for flash."
+print ""
+print "      Modem version, Modem assert information, etc."
+print ""
+print "    TX"
+print "      Kernel object information, such as mutexes, semaphores, timers, queues, etc."
+print "        _tx_export_threads.cmm"
+print "          This script is used to export all the threads into the host file, it also check the link between them."
+print "        _tx_export_mutexes.cmm"
+print "          This script is used to export all the mutexes into the host file, it also check the link between them."
+print "        _tx_export_sems.cmm"
+print "          This script is used to export all the semaphores into the host file, it also check the link between them."
+print "        _tx_export_event_flags.cmm"
+print "          This script is used to export all the event flags into the host file, it also check the link between them."
+print "        _tx_export_queues.cmm"
+print "          This script is used to export all the message queues into the host file, it also check the link between them."
+print "        _tx_export_timers.cmm"
+print "          This script is used to export all the timers into the host file, it also check the link between them."
+print ""
+print "    Task Monitor"
+print "      The kernel log data, such as IDLE, TASK, ENTER IRQ, etc."
+print "        _tm_show_version.cmm"
+print "          This script is used to show the version of the task monitor"
+print "        _tm_export_data.cmm"
+print "          This script is used to export the task monitor buffer into the HOST file."
+print ""
+print "    OSA/SCI over TX"
+print "      Kernal adapter (middle-ware) information, especially memory allocations."
+print "        _sci_tx_export_signal_queue_data.cmm"
+print "          This script is used to export the signals in the queue into the host file."
+print "        _sdi_tx_export_msg_queue_data.cmm"
+print "          This script is used to export the messages in the queue into the host file."
+print "        _sci_tx_export_mem.cmm"
+print "          This script is used to export the allocations into the host file, only for SCI allocations."
+print "        _osa_tx_export_mem.cmm"
+print "          This script is used to export the allocations into the host file, for the allocations based on osa, such as SCI-osa/osa/SDI-osa."
+print "        _osa_tx_export_one_block_pool.cmm"
+print "          This script is used to export the allocations of the specified block pool, into the host file."
+print "        _osa_tx_show_mem_top_10.cmm"
+print "          This script is used to show the top 10 of the allocations based on osa, it requires the python application."
+print "        _osa_tx_show_one_alloc.cmm"
+print "          This script is used to show the detailed information of an allocation, such as file, line, ... etc."
+print ""
+print "    LOG"
+print "      The application log data."
+print "      The following scripts are used to analyze the APP-LOG subsystem, and dump the SIPC LOG buffer."
+print "        _log_chan_buf_list.cmm"
+print "        _log_chan_buf_tracks.cmm"
+print "        _log_pool_shmem_list.cmm"
+print "        _log_ring_shmem_list.cmm"
+print "        _log_last_one_frame.cmm"
+print ""
+print "    Statistics"
+print "      The Statistics of system, ... etc"
+print "        _stat_system_statistics.cmm"
+print ""
+print "    Auto Analyze"
+print "      Auto analyze scripts."
+print "      The following scripts are used to auto analyze."
+print "        _auto_analyze_assert.cmm"
+print "          This script is used to auto analyze assert, and it depends to:"
+print "            _assert_is_assert_mode.cmm"
+print "            _assert_get_assert_info.cmm"
+print "            _assert_analyze_assert_info.cmm"
+print "              _assert_analyze_assert_info_case_no_assert_info.cmm"
+print "              _assert_analyze_assert_info_case_osa_threadx_error_handling_exp_osa_abort.cmm"
+print "              _assert_analyze_assert_info_case_osa_threadx_buff_mgr_mem_overrun.cmm"
+print "              _assert_analyze_assert_info_case_osa_threadx_itc_take_mutex_failed.cmm"
+print "              _assert_analyze_assert_info_case_osa_threadx_itc_take_sem_failed.cmm"
+print "              _assert_analyze_assert_info_case_sdi_msg_c_enqueue_failed.cmm"
+print "              _assert_analyze_assert_info_case_sdi_msg_c_osa_enque_fix_size_msg_q_failed.cmm"
+print "              _assert_analyze_assert_info_case_threadx_assert_c_exp_0.cmm"
+print "              _assert_analyze_assert_info_case_threadx_assert_c_exp_abort_except.cmm"
+print "              _assert_analyze_assert_info_case_threadx_assert_c_exp_prefetch_except.cmm"
+print "              _assert_analyze_assert_info_case_threadx_assert_c_exp_undefined_except.cmm"
+print "              _assert_analyze_assert_info_case_others.cmm"
+print "            _assert_get_abort_info.cmm"
+print ""
+print "    Settings"
+print "      The settings scripts."
+print "        _setting_show_dirs.cmm"
+print "          This script is used to show the settings directories."
+print "        _setting_input_export_dir.cmm"
+print "          This script is used to input the exporting directory."
+print ""
+print "    Auto-upgrade"
+print "      The auto upgrading scripts for this tool-chain."
+print "        _version_get_ver.cmm"
+print "        _version_upgrade.cmm"
+print ""
+print "    Basic"
+print "      The basic scripts:"
+print "        _trace32_area_delete.cmm"
+print "        _trace32_data_list.cmm"
+print "        _trace32_print_var_frame.cmm"
+print "        _trace32_print_task_frame.cmm"
+print "        _trace32_symbol_function.cmm"
+print "        _trace32_symbol_info.cmm"
+print "        _trace32_symbol_state.cmm"
+print "        _trace32_var_frame.cmm"
+print "        _trace32_var_frame_ex.cmm"
+print ""
+print ""
+print "  Version: 0.87"
+print "  Author: Pizer.Fan"
+print "  Ext: 3388"
+
+enddo

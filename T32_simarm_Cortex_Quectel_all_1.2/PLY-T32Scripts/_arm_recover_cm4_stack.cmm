@@ -1,0 +1,114 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  ARM Component                                                                                         ;;
+;;                                                                                                        ;;
+;;    Common: recover stack                                                                               ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2021/09/07         Yi.Yang                   Initial Version                                          ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Create logging output window
+area.create recover_stack_win 200. 500.
+area.select recover_stack_win
+area.view recover_stack_win
+
+;PMACRO.list
+local &err
+&err=0
+
+&curr_script_dir=os.ppd()
+
+if !symbol.exist(s_exception_type)||!symbol.exist(cur_mode_reg)
+(
+  &err=1
+  print "Error: `s_exception_type' or `cur_mode_reg' does not exist. EXIT script"
+  goto CMM_END
+)
+
+;define global varible
+local &curr_r14
+local &curr_cpsr
+local &curr_spsr
+local &curr_cpsr_mode
+local &curr_spsr_mode
+local &curr_exception_type
+local &cur_mode_reg_address
+local &svc_mode_reg_address
+local &irq_mode_reg_address
+
+;only used for cm4
+local &curr_xpsr
+local &curr_sp
+local &mpu_mmar
+local &bus_bfar
+local &mpu_save_reg_address
+
+&cur_mode_reg_address=v.value(&cur_mode_reg)
+&mpu_save_reg_address=v.value(&mpu_save_reg)
+&curr_exception_type=v.value(s_exception_type)
+
+R.S r0 V.Value(*((uint32*)(&mpu_save_reg_address)))
+R.S r1 V.Value(*((uint32*)(&mpu_save_reg_address+4)))
+R.S r2 V.Value(*((uint32*)(&mpu_save_reg_address+8)))
+R.S r3 V.Value(*((uint32*)(&mpu_save_reg_address+12)))
+R.S r12 V.Value(*((uint32*)(&mpu_save_reg_address+16)))
+R.S r14 V.Value(*((uint32*)(&mpu_save_reg_address+20)))
+R.S pc V.Value(*((uint32*)(&mpu_save_reg_address+24)))
+R.S xpsr V.Value(*((uint32*)(&mpu_save_reg_address+28)))
+R.S msp V.Value(*((uint32*)(&mpu_save_reg_address+36)))
+R.S psp V.Value(*((uint32*)(&mpu_save_reg_address+40)))
+
+R.S r4 V.Value(*((uint32*)(&cur_mode_reg_address+16)))
+R.S r5 V.Value(*((uint32*)(&cur_mode_reg_address+20)))
+R.S r6 V.Value(*((uint32*)(&cur_mode_reg_address+24)))
+R.S r7 V.Value(*((uint32*)(&cur_mode_reg_address+28)))
+R.S r8 V.Value(*((uint32*)(&cur_mode_reg_address+32)))
+R.S r9 V.Value(*((uint32*)(&cur_mode_reg_address+36)))
+R.S r10 V.Value(*((uint32*)(&cur_mode_reg_address+40)))
+R.S r11 V.Value(*((uint32*)(&cur_mode_reg_address+44)))
+
+&curr_xpsr=V.Value(*((uint32*)(&mpu_save_reg_address+28)))
+&curr_sp=V.Value(*((uint32*)(&mpu_save_reg_address+32)))
+&mpu_mmar=V.Value(*((uint32*)(&mpu_save_reg_address+68)))
+&bus_bfar=V.Value(*((uint32*)(&mpu_save_reg_address+72)))
+
+print "curr_xpsr is &curr_xpsr"
+print "curr_sp is &curr_sp"
+print "#############################################"
+print "your code can't to access addr(RO) &mpu_mmar"
+print "your code can't to access addr(RO) &bus_bfar"
+print "#############################################"
+print "curr_exception_type is &curr_exception_type"
+print "recover completely..."
+
+CMM_END:
+
+; Close the logging output window
+;wait 5s
+;if (&err==0)
+;(
+;  area.close recover_stack_win
+;  do "&curr_script_dir\_trace32_area_delete.cmm" "recover_stack_win"
+;)
+
+enddo

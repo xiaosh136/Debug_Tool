@@ -1,0 +1,177 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  TX Component                                                                                          ;;
+;;                                                                                                        ;;
+;;    Queue: Dump the content data of the queue into the HOST file.                                       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; Create logging output window
+area.create logging_win 200. 500.
+area.select logging_win
+area.view logging_win
+
+;PMACRO.list
+local &err
+&err=0
+
+; Enter the export directory if null
+global &_global_export_dir
+&curr_script_dir=os.ppd()
+do "&curr_script_dir\_setting_input_export_dir_if_null.cmm"
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+
+print "Please enter the address of queue: "
+enter &ptr
+if ("&ptr"=="")
+(
+  &err=1
+  print "Error: No input !!!. EXIT script"
+  goto CMM_END
+)
+if (string.scan("&ptr","0x",0)==-1)&&(string.scan("&ptr","0X",0)==-1)
+(
+  &ptr_string="0x&ptr"
+  &ptr=v.value(&ptr_string)
+)
+&queue_id=v.value(((TX_QUEUE*)&ptr)->tx_queue_id)
+&queue_message_size=v.value(((TX_QUEUE*)&ptr)->tx_queue_message_size)
+if &queue_id!=0x51554555
+(
+  &err=1
+  print "Error: " &ptr " is not valid queue, or had been destroied !!!. EXIT script"
+  goto CMM_END
+)
+
+if v.value(&queue_message_size)!=v.value("sizeof(sdi_msg_struct)/4")
+(
+  &err=1
+  print "Error: " &ptr " is a valid SDI-Msg queue!!!. EXIT script"
+  goto CMM_END
+)
+
+; Makeup output file path
+&queue_string_addr=v.value(((TX_QUEUE*)&ptr)->tx_queue_name)
+&queue_string_name=data.string(d:&queue_string_addr)
+&output_file_name="sdi_msg_queuedata_&(ptr).txt"
+&output_file_path="&(export_dir)/&output_file_name"
+
+print "Export to directory : &(export_dir)"
+print "Start time : " clock.date() "  " clock.time() "  ..."
+print ""
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Start ...                                                                                             ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Create output file
+area.create output_file_win 200. 500.
+area.open output_file_win "&output_file_path"
+area.select output_file_win
+
+&queue_message_size_bytes=v.value(&queue_message_size*4)
+&queue_capacity=v.value(((TX_QUEUE*)&ptr)->tx_queue_capacity)
+&queue_enqueued=v.value(((TX_QUEUE*)&ptr)->tx_queue_enqueued)
+&queue_available_storage=v.value(((TX_QUEUE*)&ptr)->tx_queue_available_storage)
+&queue_suspended_count=v.value(((TX_QUEUE*)&ptr)->tx_queue_suspended_count)
+&queue_start=v.value(((TX_QUEUE*)&ptr)->tx_queue_start)
+&queue_end=v.value(((TX_QUEUE*)&ptr)->tx_queue_end)
+&queue_read=v.value(((TX_QUEUE*)&ptr)->tx_queue_read)
+&queue_write=v.value(((TX_QUEUE*)&ptr)->tx_queue_write)
+
+print "===============Queue Info==============="
+print "  Queue Addr,  Size, Capacity,  Enqueued,  Suspended,  Name"
+print "  " &ptr "    " format.decimal(4,v.value(&queue_message_size)) "    " format.decimal(4,v.value(&queue_capacity)) "  " format.decimal(8,v.value(&queue_enqueued)) "  " format.decimal(8,v.value(&queue_suspended_count)) "         " data.string(d:&queue_string_addr)
+
+local &data_cnt
+&data_cnt=0
+
+print ""
+print "===============Queue Data Info==============="
+
+if v.value(&queue_enqueued)==v.value("0")
+(
+  print "No data"
+  goto CMM_FILE_CLOSE
+)
+
+CMM_LOOP:
+
+print format.decimal(4,v.value(&data_cnt+1)) "  " &queue_read ": "
+var.print (*(struct sdi_msg_struct *)&queue_read)
+
+&queue_read=&queue_read+&queue_message_size_bytes
+if (v.value(&queue_read)==v.value(&queue_end))
+(
+  &queue_read=&queue_start
+)
+
+&data_cnt=&data_cnt+1
+
+if (v.value(&data_cnt)<&queue_enqueued)
+  goto CMM_LOOP
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Counter Info                                                                                          ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+print ""
+print "===============Counter Info==============="
+&data_cnt=format.decimal(8,&data_cnt)
+print " Data counter: &data_cnt"
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  End                                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_FILE_CLOSE:
+print ""
+area.close output_file_win
+area.clear output_file_win
+
+type "&output_file_path"
+
+CMM_END:
+area.select logging_win
+
+print ""
+print "End time : " clock.date() "  " clock.time() "  "
+
+; Close the logging output window
+; wait 1s
+if (&err==0)
+(
+  area.close logging_win
+  do "&curr_script_dir\_trace32_area_delete.cmm" "logging_win"
+)
+
+enddo
+

@@ -1,0 +1,168 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Assert Component                                                                                      ;;
+;;                                                                                                        ;;
+;;    Assert: Analyze assert info                                                                             ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &caller_assert_win &assert_core_name &assert_core_num &caller_assert_info &assert_root_core_name &assert_root_core_index
+entry &caller_assert_win &assert_core_name &assert_core_num &caller_assert_info &assert_root_core_name &assert_root_core_index
+
+; remove \"\"
+&caller_assert_win=&caller_assert_win
+&caller_assert_info=&caller_assert_info
+&assert_core_name=&assert_core_name
+&assert_core_num=&assert_core_num
+&assert_root_core_name=&assert_root_core_name
+&assert_root_core_index=&assert_root_core_index
+
+&curr_script_dir=os.ppd()
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+
+if ("&caller_assert_info"=="")
+(
+  do "&curr_script_dir\_assert_analyze_assert_info_case_no_assert_info.cmm" "&caller_assert_win" "&assert_core_name" "&assert_core_num" "&caller_assert_info" "&assert_root_core_name" "&assert_root_core_index"
+  goto CMM_END
+)
+
+if ("&assert_core_name"!="")
+(
+  print "Assert current core: &assert_core_name"
+)
+
+if ("&assert_root_core_name"!="")
+(
+  print "Assert root core: &assert_root_core_name, " v.value(&assert_root_core_index)
+)
+
+; analyze assert info , case 1.1 : "osa_mem_alloc: Memory allocation failed info"
+if (string.scan("&caller_assert_info","osa_mem_mgr_common.c",0)!=-1)&&(string.scan("&caller_assert_info","Internal Stack underflow",0)!=-1)
+(
+  do "&curr_script_dir\_assert_analyze_assert_info_case_osa_mem_mgr_common_internal_overflow.cmm" "&caller_assert_win" "&assert_core_name" "&assert_core_num" "&caller_assert_info" "&assert_root_core_name" "&assert_root_core_index"
+)
+
+; analyze assert info , case 1.2 : "osa_mem_alloc: Memory allocation failed info"
+else if (string.scan("&caller_assert_info","osa_mem_alloc: Memory allocation failed info",0)!=-1)
+(
+  do "&curr_script_dir\_assert_analyze_assert_info_case_osa_mem_alloc_failed.cmm" "&caller_assert_win" "&assert_core_name" "&assert_core_num" "&caller_assert_info" "&assert_root_core_name" "&assert_root_core_index"
+)
+
+; analyze assert info , case 2 : "osa_threadx_itc.c" & "Take Mutex Failed info"
+else if (string.scan("&caller_assert_info","osa_threadx_itc.c",0)!=-1)&&(string.scan("&caller_assert_info","Take Mutex Failed info",0)!=-1)
+(
+  do "&curr_script_dir\_assert_analyze_assert_info_case_osa_threadx_itc_take_mutex_failed.cmm" "&caller_assert_win" "&assert_core_name" "&assert_core_num" "&caller_assert_info" "&assert_root_core_name" "&assert_root_core_index"
+)
+
+; analyze assert info , case 3.1 : "osa_threadx_buff_mgr" & "Memory over-read"
+else if (string.scan("&caller_assert_info","osa_threadx_buff_mgr",0)!=-1)&&(string.scan("&caller_assert_info","Memory over-read",0)!=-1)
+(
+  do "&curr_script_dir\_assert_analyze_assert_info_case_osa_threadx_buff_mgr_mem_overrun.cmm" "&caller_assert_win" "&assert_core_name" "&assert_core_num" "&caller_assert_info" "&assert_root_core_name" "&assert_root_core_index"
+)
+
+; analyze assert info , case 3.2 : "osa_threadx_buff_mgr" & "osa_buff_free_delqueue: The ptr which try to be free has been released!"
+else if (string.scan("&caller_assert_info","osa_threadx_buff_mgr",0)!=-1)&&(string.scan("&caller_assert_info","osa_buff_free_delqueue",0)!=-1)&&(string.scan("&caller_assert_info","has been released",0)!=-1)
+(
+  do "&curr_script_dir\_assert_analyze_assert_info_case_osa_threadx_buff_mgr_buff_has_been_released.cmm" "&caller_assert_win" "&assert_core_name" "&assert_core_num" "&caller_assert_info" "&assert_root_core_name" "&assert_root_core_index"
+)
+
+; analyze assert info , case 4 : "in file threadx_assert.c" & "exp=0"
+else if (string.scan("&caller_assert_info","in file threadx_assert.c",0)!=-1)&&(string.scan("&caller_assert_info","exp=0",0)!=-1)
+(
+  do "&curr_script_dir\_assert_analyze_assert_info_case_threadx_assert_c_exp_0.cmm" "&caller_assert_win" "&assert_core_name" "&assert_core_num" "&caller_assert_info" "&assert_root_core_name" "&assert_root_core_index"
+)
+
+; analyze assert info , case 5.1 : "osa_threadx_itc.c" & "exp=Take sem Failed"
+else if (string.scan("&caller_assert_info","osa_threadx_itc.c",0)!=-1)&&(string.scan("&caller_assert_info","exp=Take sem Failed",0)!=-1)
+(
+  do "&curr_script_dir\_assert_analyze_assert_info_case_osa_threadx_itc_take_sem_failed.cmm" "&caller_assert_win" "&assert_core_name" "&assert_core_num" "&caller_assert_info" "&assert_root_core_name" "&assert_root_core_index"
+)
+
+; analyze assert info , case 5.2 : "osa_threadx_itc.c" & "exp=Give sem Failed"
+else if (string.scan("&caller_assert_info","osa_threadx_itc.c",0)!=-1)&&(string.scan("&caller_assert_info","exp=Give sem Failed",0)!=-1)
+(
+  do "&curr_script_dir\_assert_analyze_assert_info_case_osa_threadx_itc_give_sem_failed.cmm" "&caller_assert_win" "&assert_core_name" "&assert_core_num" "&caller_assert_info" "&assert_root_core_name" "&assert_root_core_index"
+)
+
+; analyze assert info , case 6 : "sdi_msg_iram.c" & "exp=Enqueue failed info"
+else if (string.scan("&caller_assert_info","sdi_msg",0)!=-1)&&(string.scan("&caller_assert_info","exp=Enqueue failed info",0)!=-1)
+(
+  ; v.f to file
+  do "&curr_script_dir\_assert_analyze_assert_info_case_sdi_msg_c_enqueue_failed.cmm" "&caller_assert_win" "&assert_core_name" "&assert_core_num" "&caller_assert_info" "&assert_root_core_name" "&assert_root_core_index"
+)
+
+; analyze assert info , case 7 : "sdi_msg.c" & "exp=osa_enque_fix_size_msg_q failed info"
+else if (string.scan("&caller_assert_info","sdi_msg",0)!=-1)&&(string.scan("&caller_assert_info","exp=osa_enque_fix_size_msg_q failed info",0)!=-1)
+(
+  ; v.f to file
+  do "&curr_script_dir\_assert_analyze_assert_info_case_sdi_msg_c_osa_enque_fix_size_msg_q_failed.cmm" "&caller_assert_win" "&assert_core_name" "&assert_core_num" "&caller_assert_info" "&assert_root_core_name" "&assert_root_core_index"
+)
+
+; analyze assert info , case 8 : "osa_threadx_error_handling.c" & "exp=osa_abort"
+else if (string.scan("&caller_assert_info","osa_threadx_error_handling.c",0)!=-1)&&(string.scan("&caller_assert_info","exp=osa_abort",0)!=-1)
+(
+  do "&curr_script_dir\_assert_analyze_assert_info_case_osa_threadx_error_handling_exp_osa_abort.cmm" "&caller_assert_win" "&assert_core_name" "&assert_core_num" "&caller_assert_info" "&assert_root_core_name" "&assert_root_core_index"
+)
+
+; analyze assert info , case 9 : "threadx_assert.c" & "exp=Abort exception handler"
+else if (string.scan("&caller_assert_info","threadx_assert.c",0)!=-1)&&(string.scan("&caller_assert_info","exp=Abort exception handler",0)!=-1)
+(
+  do "&curr_script_dir\_assert_analyze_assert_info_case_threadx_assert_c_exp_abort_except.cmm" "&caller_assert_win" "&assert_core_name" "&assert_core_num" "&caller_assert_info" "&assert_root_core_name" "&assert_root_core_index"
+)
+
+; analyze assert info , case 10 : "threadx_assert.c" & "exp=Prefetch exception handler"
+else if (string.scan("&caller_assert_info","threadx_assert.c",0)!=-1)&&(string.scan("&caller_assert_info","exp=Prefetch exception handler",0)!=-1)
+(
+  do "&curr_script_dir\_assert_analyze_assert_info_case_threadx_assert_c_exp_prefetch_except.cmm" "&caller_assert_win" "&assert_core_name" "&assert_core_num" "&caller_assert_info" "&assert_root_core_name" "&assert_root_core_index"
+)
+
+; analyze assert info , case 11 : "threadx_assert.c" & "exp=Undefined exception handler"
+else if (string.scan("&caller_assert_info","threadx_assert.c",0)!=-1)&&(string.scan("&caller_assert_info","exp=Undefined exception handler",0)!=-1)
+(
+  do "&curr_script_dir\_assert_analyze_assert_info_case_threadx_assert_c_exp_undefined_except.cmm" "&caller_assert_win" "&assert_core_name" "&assert_core_num" "&caller_assert_info" "&assert_root_core_name" "&assert_root_core_index"
+)
+
+; analyze assert info , case 12 : "threadx_mem.c" & "exp=Invalid caller"
+else if (string.scan("&caller_assert_info","threadx_mem.c",0)!=-1)&&(string.scan("&caller_assert_info","exp=ASSERT: Error",0)!=-1)&&(string.scan("&caller_assert_info","Invalid caller of this service",0)!=-1)
+(
+  do "&curr_script_dir\_assert_analyze_assert_info_case_threadx_mem_c_invalid_caller.cmm" "&caller_assert_win" "&assert_core_name" "&assert_core_num" "&caller_assert_info" "&assert_root_core_name" "&assert_root_core_index"
+)
+; analyze assert info , case 13 : "threadx_mem.c" & "The queue was full"
+else if (string.scan("&caller_assert_info", "threadx_os_iram.c", 0)!=-1)&&(string.scan("&caller_assert_info","The queue was full",0)!=-1)
+(
+  do "&curr_script_dir\_assert_analyze_assert_info_case_queue_full.cmm" "&caller_assert_win" "&assert_core_name" "&assert_core_num" "&caller_assert_info" "&assert_root_core_name" "&assert_root_core_index" 
+)
+; analyze assert info , case 14 (others) : 
+else
+(
+  do "&curr_script_dir\_assert_analyze_assert_info_case_others.cmm" "&caller_assert_win" "&assert_core_name" "&assert_core_num" "&caller_assert_info" "&assert_root_core_name" "&assert_root_core_index"
+)
+
+CMM_END:
+
+enddo

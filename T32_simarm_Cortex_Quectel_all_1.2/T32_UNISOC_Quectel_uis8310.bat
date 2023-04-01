@@ -7,4 +7,6 @@ eecontext.exe dump/com_EE_Hbuf.bin
 echo=
 echo Load Trace32
 
-start t32marm.exe -c config.t32, t117_simulator.cmm &
+@REM start t32marm.exe -c config.t32, t117_simulator.cmm &
+
+start t32marm.exe -c config.t32,PLY-T32Scripts/_menu_PLY.cmm &

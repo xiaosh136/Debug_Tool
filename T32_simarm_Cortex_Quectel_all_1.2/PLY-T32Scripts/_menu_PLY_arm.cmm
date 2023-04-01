@@ -1,0 +1,158 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Menu Component                                                                                        ;;
+;;                                                                                                        ;;
+;;    PLY Menu : ARM                                                                                      ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;  2021/09/07      Yi.Yang                     Add CM4                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; Set the PLY script directory
+global &_global_PLY_script_dir
+&_global_PLY_script_dir=os.ppd()
+&curr_script_dir=os.ppd()
+
+MENU.ReProgram
+(
+  ADD
+  MENU
+  (
+    POPUP "[[Pizer Love You!]"
+    (
+      POPUP "[:chip]ARM"
+      (
+        ; Recover Stack
+        MENUITEM "[:chip]Recover Stack"
+        (
+          do "&_global_PLY_script_dir\_arm_recover_stack.cmm"
+        )
+        
+        ; Recover Stack
+        MENUITEM "[:chip]V3 Recover Stack"
+        (
+          do "&_global_PLY_script_dir\_arm_recover_v3_stack.cmm"
+        )
+		
+        ; Recover Stack
+        MENUITEM "[:chip]CM4 Recover Stack"
+        (
+          do "&_global_PLY_script_dir\_arm_recover_cm4_stack.cmm"
+        )        
+		
+        ; Recover Registers From Text
+        MENUITEM "[:chip]Recover Registers From Text"
+        (
+          do "&_global_PLY_script_dir\_arm_load_registers.cmm"
+        )
+
+        ; Show Core State
+        MENUITEM "[:winpage]Show Core State"
+        (
+          do "&_global_PLY_script_dir\_arm_show_core_state.cmm"
+        )
+        ; Show Frame Stack
+        MENUITEM "[:winpage]Show Frame Stack"
+        (
+          do "&_global_PLY_script_dir\_arm_show_frame_stack.cmm"
+        )
+        ;... place a separator after the menu option "Show Frame Stack"
+        AFTER "Show Frame Stack"
+        SEPARATOR
+        
+        ; Analyze Exception Stacks
+        MENUITEM "[:winpage]Analyze Exception Stacks"
+        (
+          do "&_global_PLY_script_dir\_arm_analyze_exception_stacks.cmm"
+        )
+        ; Analyze App Stack
+        MENUITEM "[:winpage]Analyze App Stack"
+        (
+          do "&_global_PLY_script_dir\_arm_analyze_app_stack.cmm"
+        )
+        ; Analyze App Stack (Manual)
+        MENUITEM "[:winpage]Analyze App Stack (Manual)"
+        (
+          do "&_global_PLY_script_dir\_arm_analyze_app_stack_manual.cmm"
+        )
+        ; Analyze Memory as Stack
+        MENUITEM "[:winpage]Analyze Memory as Stack"
+        (
+          do "&_global_PLY_script_dir\_arm_analyze_stack.cmm"
+        )
+        ; Dump Code to File
+        MENUITEM "[:plist]Dump Code to File"
+        (
+          do "&_global_PLY_script_dir\_arm_dump_code_regions.cmm"
+        )
+        ;... place a separator after the menu option "Dump Code to File"
+        AFTER "Dump Code to File"
+        SEPARATOR
+        
+        ; List MPU Regions
+        MENUITEM "[:plist]List MPU Regions"
+        (
+          do "&_global_PLY_script_dir\_arm_list_mpu_regions.cmm"
+        )
+        AFTER "List MPU Regions"
+        SEPARATOR
+        
+        ; Show modem version
+        ;MENUITEM "[:chip]Modem Version" "v.w %string s_version_info s_version_info[3] s_version_info[7]"
+        MENUITEM "[:chip]Modem Version"
+        (
+          do "&_global_PLY_script_dir\_arm_show_modem_version.cmm"
+        )
+        ; Show modem assert info
+        MENUITEM "[:chip]Modem Assert Information" "v.w assert_info_buf s_assert_buf"
+        ; Show modem assert info
+        MENUITEM "[:chip]V3 Modem Assert Information" "v.w modem_assert_info"
+        
+        AFTER "V3 Modem Assert Information"
+        SEPARATOR
+        POPUP "[:chip]ETB"
+        (
+          ; Import PSCP
+          MENUITEM "[:chip]Import PSCP MP-Core"
+          (
+            do "&_global_PLY_script_dir\_third_etb_sim_import_pscp_mpcore.cmm"
+          )
+  
+          ; Import NRCP
+          MENUITEM "[:chip]Import NRCP MP-Core"
+          (
+            do "&_global_PLY_script_dir\_third_etb_sim_import_nrcp_mpcore.cmm"
+          )
+  
+          ; Import V3PHY
+          MENUITEM "[:chip]Import V3PHY Core"
+          (
+            do "&_global_PLY_script_dir\_third_etb_sim_import_v3phy.cmm"
+          )
+        )
+      )
+    )
+  )
+)
+
+enddo

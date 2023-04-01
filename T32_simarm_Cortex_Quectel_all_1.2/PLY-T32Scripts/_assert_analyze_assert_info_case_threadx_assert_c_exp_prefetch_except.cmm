@@ -1,0 +1,186 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Assert Component                                                                                      ;;
+;;                                                                                                        ;;
+;;    Assert: Analyze assert info                                                                             ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &caller_assert_win &assert_core_name &assert_core_num &caller_assert_info &assert_root_core_name &assert_root_core_index
+entry &caller_assert_win &assert_core_name &assert_core_num &caller_assert_info &assert_root_core_name &assert_root_core_index
+
+; remove \"\"
+&caller_assert_win=&caller_assert_win
+&caller_assert_info=&caller_assert_info
+&assert_core_name=&assert_core_name
+&assert_core_num=&assert_core_num
+&assert_root_core_name=&assert_root_core_name
+&assert_root_core_index=&assert_root_core_index
+
+&curr_script_dir=os.ppd()
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+
+if (string.scan("&caller_assert_info","threadx_assert.c",0)!=-1)&&(string.scan("&caller_assert_info","exp=Prefetch exception handler",0)!=-1)
+(
+  global &_global_abort_info &_global_abort_core_index &_global_abort_DFSR_reg &_global_abort_FAR_reg
+  do "&curr_script_dir\_assert_get_abort_info.cmm"
+  
+  area.select &caller_assert_win
+  print "Assert Info: &caller_assert_info"
+  if ("&_global_abort_info"!="")
+  (
+    print "Abort Info: &_global_abort_info"
+  )
+  
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ;; Current Threads                                                                                        ;;
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  
+  &core_nums=v.value("sizeof(_tx_thread_current_ptr)/sizeof(TX_THREAD *)")
+  
+  if (&core_nums==v.value("1"))
+  (
+    ;v.w _tx_thread_current_ptr _tx_thread_execute_ptr _tx_thread_system_state
+    print "_tx_thread_current_ptr: "
+    if (v.value(_tx_thread_current_ptr)!=v.value(0))
+    (
+      &thread_name=v.value((_tx_thread_current_ptr)->tx_thread_name)
+      print "  [0]: " "0x" v.value(_tx_thread_current_ptr) " " data.string(d:&thread_name)
+    )
+    else
+    (
+      print "  [0]: " "0x0"
+    )
+    print "_tx_thread_execute_ptr: "
+    if (v.value(_tx_thread_execute_ptr)!=v.value(0))
+    (
+      &thread_name=v.value((_tx_thread_execute_ptr)->tx_thread_name)
+      print "  [0]: " "0x" v.value(_tx_thread_execute_ptr) " " data.string(d:&thread_name)
+    )
+    else
+    (
+      print "  [0]: " "0x0"
+    )
+    print "_tx_thread_system_state: "
+    print "  [0]: " "0x" v.value(_tx_thread_system_state)
+  )
+  else if (&core_nums==v.value("2"))
+  (
+    ;v.w _tx_thread_current_ptr[0] _tx_thread_current_ptr[1] _tx_thread_execute_ptr[0] _tx_thread_execute_ptr[1] _tx_thread_system_state[0] _tx_thread_system_state[1]
+    print "_tx_thread_current_ptr: "
+    if (v.value(_tx_thread_current_ptr[0])!=v.value(0))
+    (
+      &thread_name=v.value((_tx_thread_current_ptr[0])->tx_thread_name)
+      print "  [0]: " "0x" v.value(_tx_thread_current_ptr[0]) " " data.string(d:&thread_name)
+    )
+    else
+    (
+      print "  [0]: " "0x0"
+    )
+    if (v.value(_tx_thread_current_ptr[1])!=v.value(0))
+    (
+      &thread_name=v.value((_tx_thread_current_ptr[1])->tx_thread_name)
+      print "  [1]: " "0x" v.value(_tx_thread_current_ptr[1]) " " data.string(d:&thread_name)
+    )
+    else
+    (
+      print "  [1]: " "0x0"
+    )
+    print "_tx_thread_execute_ptr: "
+    if (v.value(_tx_thread_execute_ptr[0])!=v.value(0))
+    (
+      &thread_name=v.value((_tx_thread_execute_ptr[0])->tx_thread_name)
+      print "  [0]: " "0x" v.value(_tx_thread_execute_ptr[0]) " " data.string(d:&thread_name)
+    )
+    else
+    (
+      print "  [0]: " "0x0"
+    )
+    if (v.value(_tx_thread_execute_ptr[1])!=v.value(0))
+    (
+      &thread_name=v.value((_tx_thread_execute_ptr[1])->tx_thread_name)
+      print "  [1]: " "0x" v.value(_tx_thread_execute_ptr[1]) " " data.string(d:&thread_name)
+    )
+    else
+    (
+      print "  [1]: " "0x0"
+    )
+    print "_tx_thread_system_state: "
+    print "  [0]: " "0x" v.value(_tx_thread_system_state[0])
+    print "  [1]: " "0x" v.value(_tx_thread_system_state[1])
+  )
+  
+  ; print v.f
+  do "&curr_script_dir\_trace32_print_var_frame.cmm" "&export_dir\v.f.txt" "&assert_root_core_index" "&assert_core_num" "  "
+  
+  ; get thread entry
+  global &_global_osa_tx_thread_entry &_global_osa_tx_thread_doing &_global_osa_tx_thread_frame_counter &_global_is_entry_from_return_address
+  do "&curr_script_dir\_osa_tx_get_thread_entry.cmm" "&export_dir\v.f.txt" "&assert_root_core_index" "&assert_core_num"
+  if (&_global_is_entry_from_return_address==1)
+  (
+    &prev_caller_addr=register(r14)
+    print "  Find the entry by R14: &prev_caller_addr"
+  )
+  if ("&_global_osa_tx_thread_doing"!="")
+  (
+    global &_global_symbol_attr &_global_symbol_prototype &_global_symbol_source
+    do "&curr_script_dir\_trace32_symbol_info.cmm" "&export_dir\y.info.txt" "&_global_osa_tx_thread_doing"
+    print "  [Task doing: &_global_osa_tx_thread_doing] in [owner: &_global_symbol_source]"
+  )
+  if ("&_global_osa_tx_thread_entry"!="")
+  (
+    print "  [Task entry: &_global_osa_tx_thread_entry]"
+  )
+  
+  ; get thread name
+  global &_global_tx_thread_current_name
+  &_global_tx_thread_current_name=""
+  do "&curr_script_dir\_tx_thread_current_name.cmm" "&assert_root_core_index" "&assert_core_num"
+  if ("&_global_tx_thread_current_name"!="")
+  (
+    print "  [Task name: &_global_tx_thread_current_name]"
+  )
+
+  ; analyze app stack
+  &thread_current_ptr=0
+  if (&assert_core_num>1)
+  (
+    &thread_current_ptr=v.value(_tx_thread_current_ptr[&assert_root_core_index])
+  )
+  else if (&assert_core_num==1)
+  (
+    &thread_current_ptr=v.value(_tx_thread_current_ptr)
+  )
+  if (&thread_current_ptr!=0)
+  (
+    do "&curr_script_dir\_arm_analyze_app_stack.cmm" "&caller_assert_win" "&thread_current_ptr"
+  )
+  
+)
+
+enddo

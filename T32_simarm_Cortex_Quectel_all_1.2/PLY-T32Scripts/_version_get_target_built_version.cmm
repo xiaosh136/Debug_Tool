@@ -1,0 +1,138 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Version Component                                                                                     ;;
+;;                                                                                                        ;;
+;;    Version : get the built time of the target                                                          ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+global &_global_target_built_time &_global_target_built_version
+global &_global_target_built_platform_version &_global_target_built_project_version &_global_target_built_base_version &_global_target_built_hw_version
+&_global_target_built_time=""
+&_global_target_built_version=""
+&_global_target_built_platform_version=""
+&_global_target_built_project_version=""
+&_global_target_built_base_version=""
+&_global_target_built_hw_version=""
+
+&curr_script_dir=os.ppd()
+
+if !symbol.exist(s_version_info)
+(
+  goto CMM_END
+)
+
+&version_cnt=v.value(sizeof(s_version_info)/sizeof(s_version_info[0]))
+&i=0
+while (&i<&version_cnt)
+(
+  &version_ptr=v.value(s_version_info[&i])
+  if (&version_ptr!=0)
+  (
+    &version_name=data.string(d:&version_ptr)
+    if ("&version_name"!="")
+    (
+      &lower_version_name=string.lower("&version_name")
+      if (string.scan("&lower_version_name","platform",0)!=-1&&string.scan("&lower_version_name","version",0)!=-1&&string.scan("&version_name",":",0)!=-1)
+      (
+        &start_pos=string.scan("&version_name",":",0)
+        &start_pos=&start_pos+1
+        &end_pos=string.length("&version_name")
+        &version_name=string.mid("&version_name",&start_pos,&end_pos-&start_pos)
+        &_global_target_built_platform_version=string.trim("&version_name")
+      )
+      else if (string.scan("&lower_version_name","base",0)!=-1&&string.scan("&lower_version_name","version",0)!=-1&&string.scan("&version_name",":",0)!=-1)
+      (
+        &start_pos=string.scan("&version_name",":",0)
+        &start_pos=&start_pos+1
+        &end_pos=string.length("&version_name")
+        &version_name=string.mid("&version_name",&start_pos,&end_pos-&start_pos)
+        &_global_target_built_base_version=string.trim("&version_name")
+      )
+      else if (string.scan("&lower_version_name","project",0)!=-1&&string.scan("&lower_version_name","version",0)!=-1&&string.scan("&version_name",":",0)!=-1)
+      (
+        &start_pos=string.scan("&version_name",":",0)
+        &start_pos=&start_pos+1
+        &end_pos=string.length("&version_name")
+        &version_name=string.mid("&version_name",&start_pos,&end_pos-&start_pos)
+        &_global_target_built_project_version=string.trim("&version_name")
+      )
+      else if (string.scan("&lower_version_name","hw",0)!=-1&&string.scan("&lower_version_name","version",0)!=-1&&string.scan("&version_name",":",0)!=-1)
+      (
+        &start_pos=string.scan("&version_name",":",0)
+        &start_pos=&start_pos+1
+        &end_pos=string.length("&version_name")
+        &version_name=string.mid("&version_name",&start_pos,&end_pos-&start_pos)
+        &_global_target_built_hw_version=string.trim("&version_name")
+      )
+      else if (string.scan("&lower_version_name","-",0)!=-1&&string.scan("&lower_version_name","version",0)==-1&&string.scan("&version_name",":",0)!=-1)
+      (
+        &length=string.length("&version_name")
+        &char_index=0
+        &has_other_chars=0
+        while (&char_index<&length)
+        (
+          &char_value=string.char("&version_name",&char_index)
+          
+          ; 09-15-2020 13:28:17
+
+          if (&char_value==0x2d) ; '-'
+          (
+          )
+          else if (&char_value==0x3a) ; ':'
+          (
+          )
+          else if (&char_value>=0x30&&&char_value<=0x39) ; '0'-'9'
+          (
+          )
+          else if (&char_value==0x20) ; ' '
+          (
+          )
+          else
+          (
+            &has_other_chars=&has_other_chars+1
+          )
+          &char_index=&char_index+1
+        )
+        if (&has_other_chars==0)
+        (
+          &_global_target_built_time="&version_name"
+        )
+      )
+    )
+  )
+  &i=&i+1
+)
+
+CMM_END:
+if ("&_global_target_built_base_version"!="")
+(
+  &_global_target_built_version="&_global_target_built_base_version"
+)
+else if ("&_global_target_built_base_version"!="")
+(
+  &_global_target_built_version="&_global_target_built_platform_version"
+)
+
+enddo

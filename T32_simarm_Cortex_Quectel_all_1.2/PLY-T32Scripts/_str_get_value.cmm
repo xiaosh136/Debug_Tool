@@ -1,0 +1,64 @@
+
+local &caller_string &caller_start_pos
+entry &caller_string &caller_start_pos
+&caller_string=&caller_string
+&caller_start_pos=&caller_start_pos
+if ("&caller_start_pos"=="")
+(
+  &caller_start_pos=0
+)
+
+&length=string.length("&caller_string")
+&pos=&caller_start_pos
+while (string.char("&caller_string", &pos)==0x20)
+(
+  if (&pos==&length)
+  (
+    goto CMM_SKIP_EQUAL
+  )
+  &pos=&pos+1
+)
+
+; "=" ?
+CMM_SKIP_EQUAL:
+if (&pos!=&length)&&(string.char("&caller_string", &pos)==0x3d)
+(
+  &pos=&pos+1
+  while (string.char("&caller_string", &pos)==0x20)
+  (
+    if (&pos==&length)
+    (
+      goto CMM_GET_RET_VALUE
+    )
+    &pos=&pos+1
+  )
+)
+
+; get value
+CMM_GET_RET_VALUE:
+&retVal=""
+&endPos=&pos
+if (&pos!=&length)
+(
+  while (&endPos<&length)
+  (
+    if (string.char("&caller_string", &endPos)==0x20)||(string.char("&caller_string", &endPos)==0x0d)||(string.char("&caller_string", &endPos)==0x0a)
+    (
+      goto CMM_END
+    )
+    &endPos=&endPos+1
+  )
+)
+
+
+CMM_END:
+if (&pos!=&endPos)
+(
+  &retVal=string.mid("&caller_string", &pos, &endPos-&pos)
+  if (string.scan("&retVal","0x",0)==-1)&&(string.scan("&retVal","0X",0)==-1)
+  (
+    &retVal="0x&retVal"
+  )
+)
+
+enddo &retVal

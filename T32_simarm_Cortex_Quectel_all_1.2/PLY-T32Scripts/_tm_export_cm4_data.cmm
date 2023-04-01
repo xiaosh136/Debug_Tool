@@ -1,0 +1,201 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  TM Component                                                                                          ;;
+;;                                                                                                        ;;
+;;    Task Monitor : Export the data to the host file                                                     ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;  2021/09/07      Yi.Yang                     Add CM4                                                   ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; Create logging output window
+area.create logging_win 200. 500.
+area.select logging_win
+area.view logging_win
+
+;PMACRO.list
+local &err
+&err=0
+
+&last_ts = 0
+
+; Enter the export directory if null
+global &_global_export_dir
+&curr_script_dir=os.ppd()
+do "&curr_script_dir\_setting_input_export_dir_if_null.cmm"
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+
+print "Export to directory : &(export_dir)"
+print "Start time : " clock.date() "  " clock.time() "  ..."
+print ""
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Start ...                                                                                             ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+if !(symbol.exist(tm_info))
+(
+  &err=1
+  print "Error: `tm_info' does not exist. EXIT script"
+  goto CMM_END
+)
+if v.value(sizeof(TASK_TEST_POINT_T))==v.value("16")
+(
+  ;area.select logging_win
+  ;area.close logging_win
+  ;do "&curr_script_dir\_trace32_area_delete.cmm" "logging_win"
+  do "&_global_PLY_script_dir\_tm_export_data.cmm"
+  enddo
+)
+
+; Get TM version
+&name=v.value(tm_info.head.magic)
+&name=data.string(d:&name)
+&len=string.length("&name")
+&name=string.mid("&name", 0, v.value(&len-1))
+print "Task Monitor Version: &name"
+
+if ("&name"=="TASKMONITORBEGIN")
+(
+  print "  Cpu Number        : 1"
+  print "  Max Points        : " format.decimal(0, v.value(tm_info.head.nrof_point))
+  
+  &core_index=0
+  &core_num=1
+  &max_points=v.value(tm_info.head.nrof_point)
+  while (v.value(&core_index)<v.value(&core_num))
+  (
+    ; Makeup output file path
+    local &output_file_path
+    local &output_file_name
+    &output_file_name="tm_data_pm"
+    &core_index_decimal=format.decimal(0,v.value(&core_index))
+    &output_file_path="&(export_dir)/&(output_file_name)_cpu&core_index_decimal.txt"
+
+    ; Create output file
+    area.create output_file_win 200. 500.
+    area.open output_file_win "&output_file_path"
+    area.select output_file_win
+
+    ; get the start
+    area.select logging_win
+    print ""
+    print "Scan the start point of CPU[&core_index]"
+    area.select output_file_win
+    &point_max_time=0
+    &point_index=0
+    &start_point_index=0
+    &end_point_index=&max_points-1
+    while (v.value(&point_index)<v.value(&max_points))
+    (
+      if (v.value(&point_max_time)<=v.value(tm_info.point_tab[&point_index].time_id & 0x0ffffff))
+      (
+        &point_max_time=v.value(tm_info.point_tab[&point_index].time_id & 0x0ffffff)
+        &point_index=&point_index+1
+      )
+      else
+      (
+        &start_point_index=&point_index
+        &end_point_index=&point_index-1
+        goto SEARCH_END
+      )
+    )
+    
+SEARCH_END:
+    area.select logging_win
+    print "  begin at [" format.decimal(0, v.value(&start_point_index)) "].time=" format.decimal(0, v.value(tm_info.point_tab[&start_point_index].time_id & 0x0ffffff))
+    print "  end at [" format.decimal(0, v.value(&end_point_index)) "].time=" format.decimal(0, v.value(tm_info.point_tab[&end_point_index].time_id & 0x0ffffff))
+    area.select output_file_win
+    
+    if (v.value(&start_point_index)>v.value(&end_point_index))
+    (
+      ; export from start to end
+      &point_index=&start_point_index
+      while (v.value(&point_index)<v.value(&max_points))
+      (
+        do "&curr_script_dir\_tm_export_begin_data.cmm" "&point_index" "&last_ts" "&last_ts"
+        &point_index=&point_index+1
+      )
+      
+      ; export from end to max
+      &point_index=0
+      while (v.value(&point_index)<=v.value(&end_point_index))
+      (
+        do "&curr_script_dir\_tm_export_begin_data.cmm" "&point_index" "&last_ts" "&last_ts"
+        &point_index=&point_index+1
+      )
+    )
+    else
+    (
+      &point_index=&start_point_index
+      while (v.value(&point_index)<=v.value(&end_point_index))
+      (
+        do "&curr_script_dir\_tm_export_begin_data.cmm" "&point_index" "&last_ts" "&last_ts"
+        &point_index=&point_index+1
+      )
+    )
+    
+    ; open the output file.
+    print ""
+    area.close output_file_win
+    area.clear output_file_win
+	&output_file_path2="&(export_dir)/&(output_file_name)_cpu&(core_index_decimal)_task_runtime.txt"
+	do "&curr_script_dir\_tm_analyze_run_time.cmm" "&output_file_path" "&output_file_path2"
+	type "&output_file_path"
+	type "&output_file_path2"
+    ; next core
+    &core_index=&core_index+1
+  )
+)
+else
+(
+  &err=1
+  print "This version is not supported now!"
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  End                                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_END:
+area.select logging_win
+
+print ""
+print "End time : " clock.date() "  " clock.time() "  "
+
+; Close the logging output window
+; wait 1s
+
+if (&err==0)
+(
+  area.close logging_win
+  do "&curr_script_dir\_trace32_area_delete.cmm" "logging_win"
+)
+
+enddo

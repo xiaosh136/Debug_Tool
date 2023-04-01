@@ -1,0 +1,140 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  TX Component                                                                                          ;;
+;;                                                                                                        ;;
+;;    Basic: Analyze the application stack                                                                 ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &caller_analyze_app_stack_win &caller_analyze_app_stack_addr
+entry &caller_analyze_app_stack_win &caller_analyze_app_stack_addr
+&caller_analyze_app_stack_win=&caller_analyze_app_stack_win
+&caller_analyze_app_stack_addr=&caller_analyze_app_stack_addr
+
+; Create logging output window
+if ("&caller_analyze_app_stack_win"=="")
+(
+  area.create analyze_app_stack_win 200. 500.
+  area.select analyze_app_stack_win
+  area.view analyze_app_stack_win
+)
+
+global &_global_export_dir
+local &ptr
+if ("&caller_analyze_app_stack_addr"=="")
+(
+  print "Please enter the address of thread: "
+  enter &ptr
+)
+else
+(
+  &ptr=&caller_analyze_app_stack_addr
+)
+if ("&ptr"=="")
+(
+  &err=1
+  print "Error: No input !!!. EXIT script"
+  goto CMM_END
+)
+if (string.scan("&ptr","0x",0)==-1)&&(string.scan("&ptr","0X",0)==-1)
+(
+  &ptr_string="0x&ptr"
+  &ptr=v.value(&ptr_string)
+)
+&thread_id=v.value(((TX_THREAD*)&ptr)->tx_thread_id)
+if &thread_id!=0x54485244
+(
+  print "Error: " &ptr " is not valid thread, or had been destroied !!!. EXIT script"
+  goto CMM_END
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Start ...                                                                                             ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &start
+local &end
+local &name
+
+if (v.value("sizeof(TX_THREAD)")==v.value("188"))
+(
+  &start=v.value(((TX_THREAD*)&ptr)->tx_stack_start)
+  &end=&start+v.value(((TX_THREAD*)&ptr)->tx_stack_size)
+  &name=v.value(((TX_THREAD*)&ptr)->tx_thread_name)
+  &name=data.string(d:&name)
+)
+else
+(
+  &start=v.value(((TX_THREAD*)&ptr)->tx_thread_stack_start)
+  &end=&start+v.value(((TX_THREAD*)&ptr)->tx_thread_stack_size)
+  &name=v.value(((TX_THREAD*)&ptr)->tx_thread_name)
+  &name=data.string(d:&name)
+)
+
+print "Analyze stack of &name: 0x" v.value(&ptr) " , stack: 0x" v.value(&start) " - 0x" v.value(&end)
+print "{"
+&level=0
+while (v.value(&start)<v.value(&end))
+(
+  &value=v.value(*(unsigned int *)&start)
+  &name=symbol.function(p:v.value(&value))
+  if ("&name")!=""
+  (
+    &offset=-1
+    local &res
+    &res=string.scan("&name", "\", 0)
+    while (v.value(&res)>=v.value(&offset))
+    (
+      &offset=&res+1
+      &res=string.scan("&name", "\", v.value(&offset))
+    )
+    if (v.value(&offset)==v.value("-1"))
+    (
+      print "  [" v.value(&level) "] [0x" v.value(&start) "] " "0x" v.value(&value) " " "&name"
+      &level=&level+1
+    )
+    else
+    (
+      &name_len=string.length("&name")
+      &sub_name=string.mid("&name",v.value(&offset),v.value(&name_len))
+      print "  [" v.value(&level) "] [0x" v.value(&start) "] " "0x" v.value(&value) " " "&sub_name"
+      &level=&level+1
+    )
+  )
+  &start=&start+0x4
+)
+print "}"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  End                                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_END:
+if ("&caller_analyze_app_stack_win"=="")
+(
+  area.select analyze_app_stack_win
+)
+
+enddo
+

@@ -1,0 +1,135 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  TX Component                                                                                          ;;
+;;                                                                                                        ;;
+;;    Basic: Analyze the stack                                                                            ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Create logging output window
+area.create analyze_stack_win 200. 500.
+area.select analyze_stack_win
+area.view analyze_stack_win
+
+;PMACRO.list
+local &err
+&err=0
+&curr_script_dir=os.ppd()
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+
+local &ptr
+print "Please enter the address of stack: "
+enter &ptr
+
+if ("&ptr"=="")
+(
+  &err=1
+  print "Error: No input !!!. EXIT script"
+  goto CMM_END
+)
+
+local &length
+print "Please enter the length of stack: "
+enter &length
+
+if ("&length"=="")
+(
+  &err=1
+  print "Error: No input !!!. EXIT script"
+  goto CMM_END
+)
+
+if (string.scan("&ptr","0x",0)==-1)&&(string.scan("&ptr","0X",0)==-1)
+(
+  &ptr_string="0x&ptr"
+  &ptr=v.value(&ptr_string)
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Start ...                                                                                             ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &start
+local &end
+&start=v.value(&ptr)
+&end=v.value(&ptr)+v.value(&length)
+
+print "{"
+while (v.value(&start)<v.value(&end))
+(
+  &value=v.value(*(unsigned int *)&start)
+  &name=symbol.function(p:v.value(&value))
+  if ("&name")!=""
+  (
+    &offset=-1
+    local &res
+    &res=string.scan("&name", "\", 0)
+    while (v.value(&res)>=v.value(&offset))
+    (
+      &offset=&res+1
+      &res=string.scan("&name", "\", v.value(&offset))
+    )
+    &flag=v.value((&value)&(1))
+    &bl_code_addr=&value-&flag-4
+    &bl_code_addr=v.value(&bl_code_addr)
+    global &_global_code_line
+    &_global_code_line=""
+    do "&curr_script_dir\_trace32_get_code_line.cmm" "&bl_code_addr" "&export_dir\list.code.line.txt"
+    if (string.scan("&_global_code_line"," bl ",0)!=-1||string.scan("&_global_code_line"," blx ",0)!=-1)
+    (
+      &_global_code_line=" [&_global_code_line]"
+    )
+    else
+    (
+      &_global_code_line=""
+    )
+    
+    if (v.value(&offset)==v.value("-1"))
+    (
+      print "  [0x" v.value(&start) "] " "0x" v.value(&value) " " "&name" "&_global_code_line"
+    )
+    else
+    (
+      &name_len=string.length("&name")
+      &sub_name=string.mid("&name",v.value(&offset),v.value(&name_len))
+      print "  [0x" v.value(&start) "] " "0x" v.value(&value) " " "&sub_name" "&_global_code_line"
+    )
+  )
+  &start=&start+0x4
+)
+print "}"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  End                                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_END:
+
+
+enddo
+

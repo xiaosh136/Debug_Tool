@@ -1,0 +1,235 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Assert Component                                                                                      ;;
+;;                                                                                                        ;;
+;;    Assert: Analyze assert info                                                                             ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &caller_assert_win &assert_core_name &assert_core_num &caller_assert_info &assert_root_core_name &assert_root_core_index
+entry &caller_assert_win &assert_core_name &assert_core_num &caller_assert_info &assert_root_core_name &assert_root_core_index
+
+; remove \"\"
+&caller_assert_win=&caller_assert_win
+&caller_assert_info=&caller_assert_info
+&assert_core_name=&assert_core_name
+&assert_core_num=&assert_core_num
+&assert_root_core_name=&assert_root_core_name
+&assert_root_core_index=&assert_root_core_index
+
+&curr_script_dir=os.ppd()
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+
+; analyze assert info , case : "threadx_assert.c" & "exp=Abort exception handler"
+if (string.scan("&caller_assert_info","threadx_assert.c",0)!=-1)&&(string.scan("&caller_assert_info","exp=Abort exception handler",0)!=-1)
+(
+  global &_global_abort_info &_global_abort_core_index &_global_abort_DFSR_reg &_global_abort_FAR_reg
+  do "&curr_script_dir\_assert_get_abort_info.cmm"
+  
+  area.select &caller_assert_win
+  print "Assert Info: &caller_assert_info"
+  print "Abort Info: &_global_abort_info"
+  
+  ; analyze assert info , case 7.1 : "threadx_assert.c" & "exp=Abort exception handler", "Asynchronous external abort"
+  if (string.scan("&_global_abort_info", "Asynchronous external abort", 0)!=-1)
+  (
+    print "Abort Info: &_global_abort_info at core &_global_abort_core_index"
+    
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;; ETB State                                                                                              ;;
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    if (symbol.exist(s_ref_param))
+    (
+      &cs_eb_enable=v.value(s_ref_param.cs_eb_enable)
+      if (v.value(&cs_eb_enable&0x10)==v.value("0x10"))
+      (
+        &core_name=data.string(d:v.value(LOG_magicHeader.coreName))
+        if (v.value(&cs_eb_enable&0x0F)==v.value("0x1"))
+        (
+          print "ETB is enabled in the current subsys(&core_name) !"
+        )
+        else
+        (
+          print "ETB is enabled, but not int the current subsys(&core_name) !"
+        )
+      )
+    )
+    
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;; Abort stack frame                                                                                      ;;
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    
+    &core_nums=v.value("sizeof(_tx_thread_current_ptr)/sizeof(TX_THREAD *)")
+    
+    if (&core_nums==v.value("1"))
+    (
+      if (v.value(_tx_thread_current_ptr)!=v.value(0))
+      (
+        print "Abort thread: 0x" v.value(_tx_thread_current_ptr)
+        &analyze_app_stack_win="&caller_assert_win"
+        &analyze_app_stack_addr=v.value(_tx_thread_current_ptr)
+        do "&curr_script_dir\_arm_analyze_app_stack.cmm" "&analyze_app_stack_win" "&analyze_app_stack_addr"
+      )
+    )
+    else if (&core_nums==v.value("2"))
+    (
+      if (v.value(_tx_thread_current_ptr[&_global_abort_core_index])!=v.value(0))
+      (
+        print "Abort thread: 0x" v.value(_tx_thread_current_ptr[&_global_abort_core_index])
+        &analyze_app_stack_win="&caller_assert_win"
+        &analyze_app_stack_addr=v.value(_tx_thread_current_ptr[&_global_abort_core_index])
+        do "&curr_script_dir\_arm_analyze_app_stack.cmm" "&analyze_app_stack_win" "&analyze_app_stack_addr"
+      )
+    )
+    else
+    (
+    )
+  )
+  ; analyze assert info , case 7.2 (others) : "threadx_assert.c" & "exp=Abort exception handler"
+  else
+  (
+    ; v.f to file
+    do "&curr_script_dir\_trace32_var_frame.cmm" "&export_dir\v.f.txt" "&assert_root_core_index" "&assert_core_num"
+    
+    ; analyze v.f file
+    &mem_leak=0
+    local &myline
+    open #1 "&export_dir\v.f.txt" /read
+    read #1 %line &myline
+    while !file.eof(1)
+    (
+      print "  &myline"
+      if (string.scan("&myline","SCI_Malloc(",0)!=-1)
+      (
+        &mem_leak=1
+      )
+      read #1 %line &myline
+    )
+    close #1
+    
+    ; get thread entry
+    global &_global_osa_tx_thread_entry &_global_osa_tx_thread_doing &_global_osa_tx_thread_frame_counter &_global_is_entry_from_return_address
+    do "&curr_script_dir\_osa_tx_get_thread_entry.cmm" "&export_dir\v.f.txt" "&assert_root_core_index" "&assert_core_num"
+    if (&_global_is_entry_from_return_address==1)
+    (
+      &prev_caller_addr=register(r14)
+      print "  Find the entry by R14: &prev_caller_addr"
+    )
+    if ("&_global_osa_tx_thread_doing"!="")
+    (
+      global &_global_symbol_attr &_global_symbol_prototype &_global_symbol_source
+      do "&curr_script_dir\_trace32_symbol_info.cmm" "&export_dir\y.info.txt" "&_global_osa_tx_thread_doing"
+      print "  [Task doing: &_global_osa_tx_thread_doing] in [owner: &_global_symbol_source]"
+    )
+    if ("&_global_osa_tx_thread_entry"!="")
+    (
+      print "  [Task entry: &_global_osa_tx_thread_entry]"
+    )
+  
+    ; get thread name
+    global &_global_tx_thread_current_name
+    &_global_tx_thread_current_name=""
+    do "&curr_script_dir\_tx_thread_current_name.cmm" "&assert_root_core_index" "&assert_core_num"
+    if ("&_global_tx_thread_current_name"!="")
+    (
+      print "  [Task name: &_global_tx_thread_current_name]"
+    )
+    
+    if (&mem_leak==1)
+    (
+      print "  [Analyze: Memory leak] ? get the TOP of allocations ..."
+      
+      ; List TOP 10 of the allocations
+      do "&curr_script_dir\_osa_tx_list_mem_top_x.cmm" 0xa "&caller_assert_win"
+    )
+    else
+    (
+      &last_func_addr=register(pc)
+      global &_global_full_function_name &_global_function_name
+      do "&curr_script_dir\_trace32_symbol_function.cmm" "&last_func_addr"
+      if ("&_global_function_name"!="")
+      (
+        print "  Last function: &_global_function_name"
+      )
+      if (string.scan("&_global_abort_info", "Synchronous external abort", 0)!=-1||string.scan("&_global_abort_info", "Permission fault", 0)!=-1)
+      (
+        &pc=r(pc)
+        &end_addr=&pc+0xc
+        global &_global_first_code_line
+        do "&curr_script_dir\_trace32_print_data_list.cmm" "&caller_assert_win" "&pc" "&end_addr" "&assert_root_core_index" "&assert_core_num" "    "
+        if ("&_global_first_code_line"!="")
+        (
+          &first_code_line="&_global_first_code_line"
+          while ((string.scan("&first_code_line","[r",0)!=-1)&&(string.scan("&first_code_line","]",0)!=-1))
+          (
+            &start_pos=string.scan("&first_code_line","[r",0)
+            &start_pos=&start_pos+1
+            &end_pos=string.scan("&first_code_line","]",0)
+            if (&start_pos>&end_pos)
+            (
+              &first_code_line=""
+            )
+            else
+            (
+              &reg_str=string.mid("&first_code_line",&start_pos,&end_pos-&start_pos)
+              if (string.scan("&reg_str",",",0)!=-1)
+              (
+                ; [r0, r7]
+                &end_pos=string.scan("&reg_str",",",0)
+                &reg_str=string.mid("&reg_str",0,&end_pos-0)
+                &reg_str=string.trim("&reg_str")
+              )
+              &reg_value=r(&reg_str)
+              if (&_global_abort_FAR_reg==&reg_value)
+              (
+                if (string.scan("&_global_abort_info", "Synchronous external abort", 0)!=-1)
+                (
+                  print "    Synchronous external abort cause: [&reg_str]=[&reg_value]"
+                )
+                else if (string.scan("&_global_abort_info", "Permission fault", 0)!=-1)
+                (
+                  print "    Permission fault cause: [&reg_str]=[&reg_value]"
+                )
+                &first_code_line=""
+              )
+              else
+              (
+                &start_pos=string.scan("&first_code_line","]",0)
+                &start_pos=&start_pos+1
+                &end_pos=string.length("&first_code_line")
+                &first_code_line=string.mid("&first_code_line",&start_pos,&end_pos-&start_pos)
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+)
+
+enddo

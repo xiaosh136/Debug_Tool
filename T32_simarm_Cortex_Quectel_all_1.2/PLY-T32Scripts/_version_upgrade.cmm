@@ -1,0 +1,21 @@
+
+local &remote_url
+entry &remote_url
+&remote_url=&remote_url
+
+&curr_script_dir=os.ppd()
+
+global &_global_remote_url
+global &_global_remote_version
+global &_global_curr_version
+
+&download_dir="&curr_script_dir/download"
+os.command python "&curr_script_dir/_version_upgrade.py" "&_global_remote_url" "&download_dir/" "&curr_script_dir"
+wait 5.s
+
+open #1 "&curr_script_dir/curr_version.txt" /create
+write #1 "&_global_remote_version"
+close #1
+
+; update menus
+do "&curr_script_dir/_menu_PLY.cmm"

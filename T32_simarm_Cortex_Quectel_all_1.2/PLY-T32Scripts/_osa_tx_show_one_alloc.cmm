@@ -1,0 +1,302 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  OSA/TX Component                                                                                      ;;
+;;                                                                                                        ;;
+;;    Memory: Show the detailed info of an allocation                                                     ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &caller_win &caller_input_addr &caller_prefix_print
+entry &caller_win &caller_input_addr &caller_prefix_print
+&caller_win=&caller_win
+&caller_input_addr=&caller_input_addr
+&caller_prefix_print=&caller_prefix_print
+
+; Create logging output window
+if ("&caller_win"=="")
+(
+  area.create show_detailed_of_one_alloc_win 200. 500.
+  area.select show_detailed_of_one_alloc_win
+  area.view show_detailed_of_one_alloc_win
+)
+
+;PMACRO.list
+local &err
+&err=0
+&curr_script_dir=os.ppd()
+
+&input_ptr="&caller_input_addr"
+if ("&input_ptr"=="")
+(
+  print "&(caller_prefix_print)Please input the address of allocation: "
+  enter &input_ptr
+)
+
+if ("&input_ptr"=="")
+(
+  &err=1
+  print "&(caller_prefix_print)Error: No input !!!. EXIT script"
+  goto CMM_END
+)
+
+if (string.scan("&input_ptr","0x",0)==-1)&&(string.scan("&input_ptr","0X",0)==-1)
+(
+  &input_ptr_string="0x&input_ptr"
+  &input_ptr=v.value(&input_ptr_string)
+)
+
+; const values
+global &ENTITY_INFRA &ENTITY_STACK &ENTITY_GSM_STACK &ENTITY_W_STACK &ENTITY_SIGNAL
+global &ENTITY_TD_LTE_STACK &ENTITY_IMS_STACK &ENTITY_NR_STACK
+global &ENTITY_PSEUDO_START &ENTITY_OSA &ENTITY_USER &ENTITY_LAST &ENTITY_KAL
+do "&curr_script_dir\_osa_load_entity_values.cmm"
+&entity_cnt=v.value(sizeof(entity_name)/sizeof(entity_name[0]))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Allocated summary info (blocks)                                                                       ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+&ctr_max=v.value(osa_context_g.osa_num_buff_pools_created)
+&ctr=0
+
+CMM_LOOP_BLOCK_POOL_LIST:
+
+&pool_id=v.value(osa_context_g.osa_pool_info[&ctr].pool_id)
+&ppool_ctl_block=v.value(&((osa_internal_poolid)&pool_id)->pool_id)
+&tx_block_pool_name=data.string(d:v.value(((osa_os_pool_type *)&ppool_ctl_block)->tx_block_pool_name))
+&tx_block_pool_start=v.value(((osa_os_pool_type *)&ppool_ctl_block)->tx_block_pool_start)
+&tx_block_pool_end=&tx_block_pool_start+v.value(((osa_os_pool_type *)&ppool_ctl_block)->tx_block_pool_size)
+&tx_block_pool_total=v.value(((osa_os_pool_type *)&ppool_ctl_block)->tx_block_pool_total)
+&buff_max_alloced=v.value(((osa_internal_poolid)&pool_id)->buff_max_alloced)
+&tx_block_pool_available=v.value(((osa_os_pool_type *)&ppool_ctl_block)->tx_block_pool_available)
+&tx_block_pool_block_size=v.value(((osa_os_pool_type *)&ppool_ctl_block)->tx_block_pool_block_size)
+
+if ((v.value(&input_ptr)>=v.value(&tx_block_pool_start))&&(v.value(&input_ptr)<=v.value(&tx_block_pool_end)))
+(
+  &offset=v.value(&input_ptr)-v.value(&tx_block_pool_start)
+  &block_size=&tx_block_pool_block_size+4
+  &which=v.value(&offset/&block_size)
+  &ptr=v.value((&tx_block_pool_start)+((&which)*(&block_size))+4)
+  &user_ptr=v.value((&tx_block_pool_start)+((&which)*(&block_size))+4+sizeof(osa_buff_hdr_struct))
+  print "&(caller_prefix_print)Find it in the pool (&ppool_ctl_block) of &(tx_block_pool_name), list detail info from (osa_buff_hdr_struct*)&ptr: "
+  
+  &alloc_ent_id=v.value(((osa_buff_hdr_struct*)&ptr)->alloc_ent_id)
+  &num=format.decimal(0,v.value(((osa_buff_hdr_struct*)&ptr)->block_num))
+  &size=format.decimal(0,v.value(((osa_buff_hdr_struct*)&ptr)->size))
+  &entity=data.string(d:v.value(entity_name[&alloc_ent_id]))
+  &line=format.decimal(0,v.value(((osa_buff_hdr_struct*)&ptr)->line))
+  &pool_id=v.value(((osa_buff_hdr_struct*)&ptr)->pool_id)
+  
+  ; ENTITY_INFRA ... 
+  if (&alloc_ent_id==&ENTITY_INFRA)||(&alloc_ent_id==&ENTITY_STACK)||(&alloc_ent_id==&ENTITY_GSM_STACK)||(&alloc_ent_id==&ENTITY_W_STACK)||(&alloc_ent_id==&ENTITY_SIGNAL)||(&alloc_ent_id==&ENTITY_TD_LTE_STACK)||(&alloc_ent_id==&ENTITY_IMS_STACK)||(&alloc_ent_id==&ENTITY_NR_STACK)
+  (
+    ;&file=data.string(d:v.value(((osa_buff_hdr_struct*)&ptr)->file_code))
+    &file=format.decimal(0,v.value(((osa_buff_hdr_struct*)&ptr)->file_code))
+    &free_file=format.decimal(0,v.value(((osa_buff_hdr_struct*)&ptr)->free_file_code))
+    &free_line=format.decimal(0,v.value(((osa_buff_hdr_struct*)&ptr)->free_line))
+    print  "&(caller_prefix_print)(osa_buff_hdr_struct*)0x" format.hex(0,v.value(&ptr)) " = {"
+    print  "&(caller_prefix_print)  block_num=&(num)"
+    print  "&(caller_prefix_print)  size=&(size)"
+    print  "&(caller_prefix_print)  alloc_ent_id=&(entity)"
+    print  "&(caller_prefix_print)  file=&(file)"
+    print  "&(caller_prefix_print)  line=&(line)"
+    print  "&(caller_prefix_print)  free_file=&(free_file)"
+    print  "&(caller_prefix_print)  free_line=&(free_line)"
+    print  "&(caller_prefix_print)}"
+  )
+  else
+  (
+    ; ENTITY_OSA, ENTITY_USER
+    if (&alloc_ent_id==&ENTITY_OSA)||(&alloc_ent_id==&ENTITY_USER)
+    (
+      &tmp1=v.value(((osa_buff_hdr_struct*)&ptr)->alloc_id)
+      &tmp1_tmp=&tmp1*0x1000000
+      &tmp2=v.value(((osa_buff_hdr_struct*)&ptr)->file_ent_id)
+      &tmp2_tmp=&tmp2*0x10000
+      &tmp3=v.value(((osa_buff_hdr_struct*)&ptr)->file_code)
+      &tmp4=&(tmp1_tmp)+&(tmp2_tmp)+&(tmp3)
+      &file=data.string(d:&tmp4)
+      print  "&(caller_prefix_print)(osa_buff_hdr_struct*)0x" format.hex(0,v.value(&ptr)) " = {"
+      print  "&(caller_prefix_print)  block_num=&(num)"
+      print  "&(caller_prefix_print)  size=&(size)"
+      print  "&(caller_prefix_print)  alloc_ent_id=&(entity)"
+      print  "&(caller_prefix_print)  file=&(file)"
+      print  "&(caller_prefix_print)  line=&(line)"
+      print  "&(caller_prefix_print)  pool_id=&(pool_id)"
+      print  "&(caller_prefix_print)}"
+    )
+    
+    ; 
+    else
+    (
+      print  "demaged?"
+      var.print *((osa_buff_hdr_struct*)&ptr)
+    )
+  )
+  
+  goto CMM_END
+)
+
+&ctr_tmp=&ctr+1
+&ctr=&ctr_tmp
+
+if (&ctr<&ctr_max)
+  goto CMM_LOOP_BLOCK_POOL_LIST
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Allocated memory info(BYTE for OSA POOL)                                                              ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+&head_symbol="byte_pool_head"
+&head_symbol_val=address.offset(&head_symbol)
+&ptr=v.value(&head_symbol.succ)
+
+CMM_LOOP_BYTE_OSA_POOL:
+
+&num=format.decimal(0,v.value(((byte_heap_hdr_struct*)&ptr)->block_num))
+&size=format.decimal(0,v.value(((byte_heap_hdr_struct*)&ptr)->size))
+&file=data.string(d:v.value(((byte_heap_hdr_struct*)&ptr)->file_name))
+&line=format.decimal(0,v.value(((byte_heap_hdr_struct*)&ptr)->line))
+&ptr_end=v.value(&ptr)+v.value(((byte_heap_hdr_struct*)&ptr)->size)
+
+if ((v.value(&input_ptr)>=v.value(&ptr))&&(v.value(&input_ptr)<=v.value(&ptr_end)))
+(
+  print  "&(caller_prefix_print)Find it in the OSA byte pool of byte_pool_head: "
+  print  "&(caller_prefix_print)(byte_heap_hdr_struct*)0x" format.hex(0,v.value(&ptr)) " = {"
+  print  "&(caller_prefix_print)  block_num=&(num)"
+  print  "&(caller_prefix_print)  size=&(size)"
+  print  "&(caller_prefix_print)  file=&(file)"
+  print  "&(caller_prefix_print)  line=&(line)"
+  print  "&(caller_prefix_print)}"
+  goto CMM_END
+)
+
+&ptr_tmp=v.value(((byte_heap_hdr_struct*)&ptr)->succ)
+&ptr=&ptr_tmp
+
+if (&ptr!=&head_symbol_val)&&(&ptr!=0)
+  goto CMM_LOOP_BYTE_OSA_POOL
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Allocated memory info(BYTE for STACK POOL)                                                            ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+&MEM_INVALID_STATE=0
+&OSA_MEM_DEALLOCATED=1
+&OSA_MEM_ALLOCATED=2
+
+&max=v.value(osa_max_num_mem_allocations_g)
+&i=0
+
+CMM_LOOP_STACK_BYTE_POOL:
+
+&mem_state=v.value(osa_mem_log_g[&i].mem_state)
+&alloc_ent_id=v.value(osa_mem_log_g[&i].trans_src.alloc_ent_id)
+&alloc_id=format.decimal(0,v.value(osa_mem_log_g[&i].trans_src.alloc_id))
+&file_code=format.decimal(0,v.value(osa_mem_log_g[&i].trans_src.file_code))
+&line_no=format.decimal(0,v.value(osa_mem_log_g[&i].trans_src.line_no))
+&size=format.decimal(0,v.value(osa_mem_log_g[&i].size))
+&ptr=v.value(osa_mem_log_g[&i].ptr)
+&ptr_end=v.value(&ptr)+v.value(&size)
+
+local &entity
+&entity=""
+do "&curr_script_dir\_osa_get_entity_name.cmm" "&alloc_ent_id"
+entry &entity
+if ("&entity"=="")
+(
+  &entity="UNKNOWN(&alloc_ent_id)"
+)
+
+if ((v.value(&input_ptr)>=v.value(&ptr))&&(v.value(&input_ptr)<=v.value(&ptr_end)))
+(
+  ; if (&mem_state==&OSA_MEM_ALLOCATED)
+  if (&mem_state==&OSA_MEM_ALLOCATED)
+  (
+    if (&alloc_ent_id==&ENTITY_INFRA)
+    (
+      print  "&(caller_prefix_print)Find it in the INFRA byte pool of osa_mem_log_g[]: "
+      print  "&(caller_prefix_print)osa_mem_log_g[&i] = {"
+      print  "&(caller_prefix_print)  alloc_id=&(alloc_id)"
+      print  "&(caller_prefix_print)  size=&(size)"
+      print  "&(caller_prefix_print)  entity=&(entity)"
+      print  "&(caller_prefix_print)  file=&(file_code)"
+      print  "&(caller_prefix_print)  line=&(line_no)"
+      print  "&(caller_prefix_print)  ptr=&(ptr)"
+      print  "&(caller_prefix_print)}"
+      goto CMM_END
+    )
+    else if (&alloc_ent_id==&ENTITY_OSA)||(&alloc_ent_id==&ENTITY_KAL)||(&alloc_ent_id==&ENTITY_LAST)
+    (
+      print  "&(caller_prefix_print)Find it in the ENTITY_OSA byte pool of osa_mem_log_g[]: "
+      print  "&(caller_prefix_print)osa_mem_log_g[&i] = {"
+      print  "&(caller_prefix_print)  alloc_id=&(alloc_id)"
+      print  "&(caller_prefix_print)  size=&(size)"
+      print  "&(caller_prefix_print)  entity=&(entity)"
+      print  "&(caller_prefix_print)  file=&(file_code)"
+      print  "&(caller_prefix_print)  line=&(line_no)"
+      print  "&(caller_prefix_print)  ptr=&(ptr)"
+      print  "&(caller_prefix_print)}"
+      goto CMM_END
+    )
+    else
+    (
+      print  "&(caller_prefix_print)Find it in the STACK byte pool of osa_mem_log_g[]: "
+      print  "&(caller_prefix_print)osa_mem_log_g[&i] = {"
+      print  "&(caller_prefix_print)  alloc_id=&(alloc_id)"
+      print  "&(caller_prefix_print)  size=&(size)"
+      print  "&(caller_prefix_print)  entity=&(entity)"
+      print  "&(caller_prefix_print)  file=&(file_code)"
+      print  "&(caller_prefix_print)  line=&(line_no)"
+      print  "&(caller_prefix_print)  ptr=&(ptr)"
+      print  "&(caller_prefix_print)}"
+      goto CMM_END
+    )
+  )
+)
+
+&i_tmp=&i+1
+&i=&i_tmp
+
+if (&i<&max)
+  goto CMM_LOOP_STACK_BYTE_POOL
+  
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  END                                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+if ("&caller_win"=="")
+(
+  area.select show_detailed_of_one_alloc_win
+)
+
+print "&(caller_prefix_print)No result."
+
+CMM_END:
+
+enddo

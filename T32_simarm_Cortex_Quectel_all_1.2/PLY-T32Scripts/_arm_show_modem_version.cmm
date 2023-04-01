@@ -1,0 +1,94 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  TX Component                                                                                          ;;
+;;                                                                                                        ;;
+;;    Basic: Show the basic info of cores (subsystem)                                                     ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &caller_output_file
+entry &caller_output_file
+&caller_output_file=&caller_output_file
+
+&curr_script_dir=os.ppd()
+
+; Create logging output window
+area.create show_modem_version_win 200. 500.
+area.select show_modem_version_win
+area.view show_modem_version_win
+
+global &_global_export_dir
+
+global &_global_target_built_time &_global_target_built_version
+global &_global_target_built_platform_version &_global_target_built_project_version &_global_target_built_base_version &_global_target_built_hw_version
+do "&curr_script_dir\_version_get_target_built_version.cmm"
+if ("&_global_target_built_version"!="")
+(
+  print "built version: &_global_target_built_version"
+)
+if ("&_global_target_built_time"!="")
+(
+  print "built time: &_global_target_built_time"
+)
+
+print "{"
+
+if ("&_global_target_built_platform_version"!="")
+(
+  print "  platform version: &_global_target_built_platform_version"
+)
+if ("&_global_target_built_project_version"!="")
+(
+  print "  project version: &_global_target_built_project_version"
+)
+if ("&_global_target_built_hw_version"!="")
+(
+  print "  hw version: &_global_target_built_hw_version"
+)
+if ("&_global_target_built_base_version"!="")
+(
+  print "  base version: &_global_target_built_base_version"
+)
+
+print "}"
+
+if ("&caller_output_file"!="")
+(
+  open #3 "&caller_output_file" /create
+  if ("&_global_target_built_version"!="")
+  (
+    write #3  "built version: &_global_target_built_version"
+  )
+  if ("&_global_target_built_time"!="")
+  (
+    write #3  "built time: &_global_target_built_time"
+  )
+  close #3
+)
+
+CMM_END:
+area.select show_modem_version_win
+
+enddo
+

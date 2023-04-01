@@ -1,0 +1,108 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Statistics Component                                                                                  ;;
+;;                                                                                                        ;;
+;;    Statistics: stat the symbols of image                                                               ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Create output window
+area.create stat_system_statistics_win 200. 500.
+area.select stat_system_statistics_win
+area.view stat_system_statistics_win
+
+;PMACRO.list
+local &err
+&err=0
+&curr_script_dir=os.ppd()
+
+&curr_script_dir=os.ppd()
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+
+global &_global_symbol_section_cnt &_global_symbol_function_cnt &_global_symbol_type_cnt &_global_symbol_file_cnt &_global_symbol_line_cnt
+do "&curr_script_dir\_trace32_symbol_state.cmm" "&export_dir\symbol.state.txt"
+
+print "=============== Image Symbols Statistics ==============="
+print "files: " format.decimal(0, &_global_symbol_file_cnt)
+print "lines: " format.decimal(0, &_global_symbol_line_cnt)
+print "functions: " format.decimal(0, &_global_symbol_function_cnt)
+print "types: " format.decimal(0, &_global_symbol_type_cnt)
+
+print ""
+print "=============== Memory Config Regions ==============="
+if (symbol.exist(mem_cfg))
+(
+  &i=0
+  &count=v.value(sizeof(mem_cfg)/sizeof(mem_cfg[0]))
+  print "Start Addr    Size    Name"
+  while (&i<&count)
+  (
+    &type=v.value(mem_cfg[&i].type)
+    &name=v.value(mem_cfg[&i].name)
+    &name=data.string(d:&name)
+    print "0x" format.hex(8, v.value(mem_cfg[&i].start)) " " format.decimal(9, v.value(mem_cfg[&i].size)) " " "&name"
+    &i=&i+1
+  )
+)
+
+print ""
+print "=============== OS Running Time Statistics ==============="
+if (symbol.exist(_tx_thread_created_count))
+(
+  print "threads: " format.decimal(0, v.value(_tx_thread_created_count))
+)
+if (symbol.exist(_tx_queue_created_count))
+(
+  print "queues: " format.decimal(0, v.value(_tx_queue_created_count))
+)
+if (symbol.exist(_tx_timer_created_count))
+(
+  print "timers: " format.decimal(0, v.value(_tx_timer_created_count))
+)
+if (symbol.exist(_tx_semaphore_created_count))
+(
+  print "semaphores: " format.decimal(0, v.value(_tx_semaphore_created_count))
+)
+if (symbol.exist(_tx_mutex_created_count))
+(
+  print "mutexes: " format.decimal(0, v.value(_tx_mutex_created_count))
+)
+if (symbol.exist(_tx_event_flags_created_count))
+(
+  print "event flags: " format.decimal(0, v.value(_tx_event_flags_created_count))
+)
+if (symbol.exist(_tx_byte_pool_created_count))
+(
+  print "byte pools: " format.decimal(0, v.value(_tx_byte_pool_created_count))
+)
+if (symbol.exist(_tx_block_pool_created_count))
+(
+  print "block pools: " format.decimal(0, v.value(_tx_block_pool_created_count))
+)
+
+enddo

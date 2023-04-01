@@ -1,0 +1,182 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Assert Component                                                                                      ;;
+;;                                                                                                        ;;
+;;    Assert: Analyze assert info                                                                             ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &caller_assert_win &assert_core_name &assert_core_num &caller_assert_info &assert_root_core_name &assert_root_core_index
+entry &caller_assert_win &assert_core_name &assert_core_num &caller_assert_info &assert_root_core_name &assert_root_core_index
+
+; remove \"\"
+&caller_assert_win=&caller_assert_win
+&caller_assert_info=&caller_assert_info
+&assert_core_name=&assert_core_name
+&assert_core_num=&assert_core_num
+&assert_root_core_name=&assert_root_core_name
+&assert_root_core_index=&assert_root_core_index
+
+&curr_script_dir=os.ppd()
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+
+; analyze assert info , case : "osa_threadx_error_handling.c" & "exp=osa_abort"
+if (string.scan("&caller_assert_info","osa_threadx_error_handling.c",0)!=-1)&&(string.scan("&caller_assert_info","exp=osa_abort",0)!=-1)
+(
+  area.select &caller_assert_win
+  print "Assert Info: &caller_assert_info"
+  
+  ; v.f to file
+  do "&curr_script_dir\_trace32_var_frame.cmm" "&export_dir\v.f.txt" "&assert_root_core_index" "&assert_core_num"
+  
+  ; analyze v.f file
+  &seems_mta_inject_msg_cmd_invalid_queue_or_queue_full=0
+  &has_ISR_Handler=0
+  local &myline
+  open #1 "&export_dir\v.f.txt" /read
+  read #1 %line &myline
+  while !file.eof(1)
+  (
+    print "  &myline"
+    if (string.scan("&myline","TXAS_SystemAssert(",0)!=-1)
+    (
+      read #1 %line &myline
+      if (!file.eof(1))
+      (
+        print "  &myline"
+        if (string.scan("&myline","sdi_msg_rcvr_from_mta(",0)!=-1)
+        (
+          read #1 %line &myline
+          if (!file.eof(1))
+          (
+            print "  &myline"
+            if (string.scan("&myline","mta_inject_msg_cmd(",0)!=-1)
+            (
+              &seems_mta_inject_msg_cmd_invalid_queue_or_queue_full=1
+            )
+          )
+        )
+      )
+    )
+    else if (string.scan("&myline","ISR_Handler(",0)!=-1)
+    (
+      &has_ISR_Handler=1
+    )
+    read #1 %line &myline
+  )
+  close #1
+  
+  ; get thread entry
+  global &_global_osa_tx_thread_entry &_global_osa_tx_thread_doing &_global_osa_tx_thread_frame_counter &_global_is_entry_from_return_address
+  do "&curr_script_dir\_osa_tx_get_thread_entry.cmm" "&export_dir\v.f.txt" "&assert_root_core_index" "&assert_core_num"
+  if (&_global_is_entry_from_return_address==1)
+  (
+    &prev_caller_addr=register(r14)
+    print "  Find the entry by R14: &prev_caller_addr"
+  )
+  if ("&_global_osa_tx_thread_doing"!="")
+  (
+    global &_global_symbol_attr &_global_symbol_prototype &_global_symbol_source
+    do "&curr_script_dir\_trace32_symbol_info.cmm" "&export_dir\y.info.txt" "&_global_osa_tx_thread_doing"
+    print "  [Task doing: &_global_osa_tx_thread_doing] in [owner: &_global_symbol_source]"
+  )
+  if ("&_global_osa_tx_thread_entry"!="")
+  (
+    print "  [Task entry: &_global_osa_tx_thread_entry]"
+  )
+  
+  ; get thread name
+  global &_global_tx_thread_current_name
+  &_global_tx_thread_current_name=""
+  do "&curr_script_dir\_tx_thread_current_name.cmm" "&assert_root_core_index" "&assert_core_num"
+  if ("&_global_tx_thread_current_name"!="")
+  (
+    print "  [Task name: &_global_tx_thread_current_name]"
+  )
+  
+  ; handle seems_mta_inject_msg_cmd_invalid_queue_or_queue_full
+  if (v.value(&seems_mta_inject_msg_cmd_invalid_queue_or_queue_full)==v.value("1"))
+  (
+    global &_global_full_queue_address
+    global &_global_full_queue_name
+    &_global_full_queue_address=0
+    &_global_full_queue_name=""
+    do "&curr_script_dir\_tx_get_full_queue.cmm"
+
+    if ("&_global_full_queue_name"!="")
+    (
+      print "  [Analyze: Queue full] at queue [owner: &_global_full_queue_name] (&_global_full_queue_address), [owner: script-to-mta]!"
+    )
+    else
+    (
+      ; v.f to file
+      do "&curr_script_dir\_trace32_var_frame_ex.cmm" "&export_dir\v.f.ex.txt" "&assert_root_core_index" "&assert_core_num"
+      
+      ; analyze v.f file
+      &il_msg_ptr_value=""
+      &step_state=0
+      local &myline
+      open #1 "&export_dir\v.f.ex.txt" /read
+      read #1 %line &myline
+      while !file.eof(1)
+      (
+        if (string.scan("&myline","|mta_inject_msg_cmd(",0)!=-1)
+        (
+          &step_state=1
+        )
+        else if (string.scan("&myline","il_msg_ptr = ",0)!=-1)
+        (
+          if (&step_state==1)
+          (
+            &pos=string.scan("&myline","il_msg_ptr = ",0)
+            &pos=v.value(&pos+13)
+            &end_pos=string.length("&myline")
+            &il_msg_ptr_value=string.mid("&myline",v.value(&pos),v.value(&end_pos-&pos))
+          )
+        )
+        read #1 %line &myline
+      )
+      close #1
+
+      if ("&il_msg_ptr_value"=="")
+      (
+        print "  [Analyze: Invalid queue] (NULL), [owner: script-to-mta]!"
+      )
+      else
+      (
+        &dest_mod_id=format.decimal(0,v.value(((sdi_msg_struct *)&il_msg_ptr_value)->dest_mod_id))
+        print "  [Analyze: Invalid queue] (NULL) for message &il_msg_ptr_value, mod_task_g[&dest_mod_id]=" v.value(mod_task_g[&dest_mod_id]) ", [owner: script-to-mta]!"
+        print "  The sending message: "
+        var.print (*(sdi_msg_struct *)&il_msg_ptr_value)
+      )
+      
+    )
+  )
+)
+
+enddo

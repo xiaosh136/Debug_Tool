@@ -1,0 +1,370 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                                                        ;;
+;;                                Copyright (c) 2019-2020 by Pizer.Fan                                    ;;
+;;                                                                                                        ;;
+;;  This software is copyrighted by and is the sole property of Pizer.Fan. All rights, title, ownership,  ;;
+;;  or other interests in the software remain the property of Pizer.Fan. Any unauthorized use,            ;;
+;;  duplication, transmission, distribution, or disclosure of this software is expressly forbidden.       ;;
+;;  This Copyright notice may not be removed or modified without prior written consent of Pizer.Fan       ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  OSA/TX Component                                                                                      ;;
+;;                                                                                                        ;;
+;;    Memory: Save the allocations of memory info into the HOST file.                                     ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Release History                                                                                       ;;
+;;                                                                                                        ;;
+;;    Date              Name                      Description                                             ;;
+;;                                                                                                        ;;
+;;  2020/08/07      Pizer.Fan                   Initial Version                                           ;;
+;;                                                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+entry &caller_logging_win
+
+; remove \"\"
+&caller_logging_win=&caller_logging_win
+
+; Create logging output window
+if ("&caller_logging_win"=="")
+(
+  area.create logging_win 200. 500.
+  area.select logging_win
+  area.view logging_win
+)
+
+;PMACRO.list
+local &err
+&err=0
+&corrupted_block_mem_ptr=0
+
+&curr_script_dir=os.ppd()
+
+global &_global_export_dir
+&export_dir="&_global_export_dir"
+if "&(export_dir)"==""
+(
+  &export_dir=os.pwd()
+)
+
+; Makeup output file path
+global &_global_osa_tx_export_mem_xml_file_path
+local &output_file_name
+local &core_name
+if y.exist(LOG_magicHeader)
+(
+  &core_name=data.string(d:v.value(LOG_magicHeader.coreName))
+  &output_file_name="osa_tx_allocinfo_&(core_name).xml"
+)
+else
+(
+  &output_file_name="osa_tx_allocinfo.xml"
+)
+&_global_osa_tx_export_mem_xml_file_path="&(export_dir)/&output_file_name"
+
+if ("&caller_logging_win"=="")
+(
+  print "Export to directory : &(export_dir)"
+  print "Start time : " clock.date() "  " clock.time() "  ..."
+  print ""
+)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Start ...                                                                                             ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+local &head_symbol &head_symbol_val &ptr
+&head_symbol="osa_buff_alloc_head_g"
+if !(symbol.exist(&head_symbol))
+(
+  &err=1
+  print "Error: `osa_buff_alloc_head_g' does not exist. EXIT script"
+  goto CMM_END
+)
+
+; Create output file
+area.create output_file_win 200. 500.
+area.open output_file_win "&_global_osa_tx_export_mem_xml_file_path"
+area.select output_file_win
+
+; const values
+global &ENTITY_INFRA &ENTITY_STACK &ENTITY_GSM_STACK &ENTITY_W_STACK &ENTITY_SIGNAL
+global &ENTITY_TD_LTE_STACK &ENTITY_IMS_STACK &ENTITY_NR_STACK
+global &ENTITY_PSEUDO_START &ENTITY_OSA &ENTITY_USER &ENTITY_LAST &ENTITY_KAL
+do "&curr_script_dir\_osa_load_entity_values.cmm"
+&entity_cnt=v.value(sizeof(entity_name)/sizeof(entity_name[0]))
+
+print "<osa_tx_allocations>"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Allocated memory info(BLOCK)                                                                          ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_EXPORT_BLOCK_ALLOCATIONS:
+
+print "<block_pool>"
+
+&head_symbol_val=address.offset(&head_symbol)
+&ptr=v.value(&head_symbol.succ)
+
+CMM_LOOP_2:
+
+; Check address of ptr
+&hdr_stamp=v.value(((osa_buff_hdr_struct*)&ptr)->hdr_stamp)
+if &hdr_stamp!=0xF1F1F1F1
+(
+  &corrupted_block_mem_ptr=&ptr
+  print "</block_pool>"
+  ;goto CMM_FILE_CLOSE
+  goto CMM_EXPORT_BYTE_ALLOCATIONS
+)
+  
+
+&alloc_ent_id=v.value(((osa_buff_hdr_struct*)&ptr)->alloc_ent_id)
+
+&num=format.decimal(0,v.value(((osa_buff_hdr_struct*)&ptr)->block_num))
+&size=format.decimal(0,v.value(((osa_buff_hdr_struct*)&ptr)->size))
+&entity=data.string(d:v.value(entity_name[&alloc_ent_id]))
+&line=format.decimal(0,v.value(((osa_buff_hdr_struct*)&ptr)->line))
+&pool_id=v.value(((osa_buff_hdr_struct*)&ptr)->pool_id)
+
+; ENTITY_INFRA ... 
+if (&alloc_ent_id==&ENTITY_INFRA)||(&alloc_ent_id==&ENTITY_STACK)||(&alloc_ent_id==&ENTITY_GSM_STACK)||(&alloc_ent_id==&ENTITY_W_STACK)||(&alloc_ent_id==&ENTITY_SIGNAL)||(&alloc_ent_id==&ENTITY_TD_LTE_STACK)||(&alloc_ent_id==&ENTITY_IMS_STACK)||(&alloc_ent_id==&ENTITY_NR_STACK)
+(
+  ;&file=data.string(d:v.value(((osa_buff_hdr_struct*)&ptr)->file_code))
+  &file=format.decimal(0,v.value(((osa_buff_hdr_struct*)&ptr)->file_code))
+  
+  &item_string=""
+  &item_string="&item_string"+" <item>"
+  &item_string="&item_string"+"  <num>&(num)</num>"
+  &item_string="&item_string"+"  <size>&(size)</size>"
+  &item_string="&item_string"+"  <entt>&(entity)</entt>"
+  &item_string="&item_string"+"  <file>&(file)</file>"
+  &item_string="&item_string"+"  <line>&(line)</line>"
+  &item_string="&item_string"+"  <addr>&(ptr)</addr>"
+  &item_string="&item_string"+"</item>"
+  
+  print "&item_string"
+  ;print " <item>"
+  ;print "  <num>&(num)</num>"
+  ;print "  <size>&(size)</size>"
+  ;print "  <entt>&(entity)</entt>"
+  ;print "  <file>&(file)</file>"
+  ;print "  <line>&(line)</line>"
+  ;print "  <addr>&(ptr)</addr>"
+  ;print " </item>"
+)
+
+; ENTITY_OSA, ENTITY_USER
+if (&alloc_ent_id==&ENTITY_OSA)||(&alloc_ent_id==&ENTITY_USER)
+(
+  &tmp1=v.value(((osa_buff_hdr_struct*)&ptr)->alloc_id)
+  &tmp1_tmp=&tmp1*0x1000000
+  &tmp2=v.value(((osa_buff_hdr_struct*)&ptr)->file_ent_id)
+  &tmp2_tmp=&tmp2*0x10000
+  &tmp3=v.value(((osa_buff_hdr_struct*)&ptr)->file_code)
+  &tmp4=&(tmp1_tmp)+&(tmp2_tmp)+&(tmp3)
+  &file=data.string(d:&tmp4)
+  
+  &item_string=""
+  &item_string="&item_string"+" <item>"
+  &item_string="&item_string"+"  <num>&(num)</num>"
+  &item_string="&item_string"+"  <size>&(size)</size>"
+  &item_string="&item_string"+"  <entt>&(entity)</entt>"
+  &item_string="&item_string"+"  <file>&(file)</file>"
+  &item_string="&item_string"+"  <line>&(line)</line>"
+  &item_string="&item_string"+"  <addr>&(ptr)</addr>"
+  &item_string="&item_string"+" </item>"
+  
+  ; size over 200?
+  &item_string_len=string.length("&item_string")
+  if (&item_string_len<v.value("0xC8"))
+  (
+    print "&(item_string)"
+  )
+  else
+  (
+    print " <item>"
+    print "  <num>&(num)</num>"
+    print "  <size>&(size)</size>"
+    print "  <entt>&(entity)</entt>"
+    print "  <file>&(file)</file>"
+    print "  <line>&(line)</line>"
+    print "  <addr>&(ptr)</addr>"
+    print " </item>"
+  )
+)
+
+&ptr_tmp=v.value(((osa_buff_hdr_struct*)&ptr)->succ)
+&ptr=&ptr_tmp
+
+if (&ptr!=&head_symbol_val)&&(&ptr!=0)
+  goto CMM_LOOP_2
+
+print "</block_pool>"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Allocated memory info(BYTE for OSA POOL)                                                              ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_EXPORT_BYTE_ALLOCATIONS:
+
+print "<byte_osa_pool>"
+
+&head_symbol="byte_pool_head"
+&head_symbol_val=address.offset(&head_symbol)
+&ptr=v.value(&head_symbol.succ)
+
+CMM_LOOP_3:
+
+&num=format.decimal(0,v.value(((byte_heap_hdr_struct*)&ptr)->block_num))
+&size=format.decimal(0,v.value(((byte_heap_hdr_struct*)&ptr)->size))
+&file=data.string(d:v.value(((byte_heap_hdr_struct*)&ptr)->file_name))
+&line=format.decimal(0,v.value(((byte_heap_hdr_struct*)&ptr)->line))
+
+&item_string=""
+&item_string="&item_string"+" <item>"
+&item_string="&item_string"+"  <num>&(num)</num>"
+&item_string="&item_string"+"  <size>&(size)</size>"
+&item_string="&item_string"+"  <file>&(file)</file>"
+&item_string="&item_string"+"  <line>&(line)</line>"
+&item_string="&item_string"+"  <addr>&(ptr)</addr>"
+&item_string="&item_string"+"</item>"
+
+print "&item_string"
+;print " <item>"
+;print "  <num>&(num)</num>"
+;print "  <size>&(size)</size>"
+;print "  <file>\"&(file)\"</file>""
+;print "  <line>&(line)</line>"
+;print "  <addr>&(ptr)</addr>"
+;print " </item>"
+
+&ptr_tmp=v.value(((byte_heap_hdr_struct*)&ptr)->succ)
+&ptr=&ptr_tmp
+
+if (&ptr!=&head_symbol_val)&&(&ptr!=0)
+  goto CMM_LOOP_3
+
+print "</byte_osa_pool>"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Allocated memory info(BYTE for STACK POOL)                                                            ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+print "<byte_stack_pool>"
+
+&MEM_INVALID_STATE=0
+&OSA_MEM_DEALLOCATED=1
+&OSA_MEM_ALLOCATED=2
+
+&max=v.value(osa_max_num_mem_allocations_g)
+&i=0
+
+CMM_LOOP_4:
+
+&mem_state=v.value(osa_mem_log_g[&i].mem_state)
+&alloc_ent_id=v.value(osa_mem_log_g[&i].trans_src.alloc_ent_id)
+&alloc_id=format.decimal(0,v.value(osa_mem_log_g[&i].trans_src.alloc_id))
+&file_code=format.decimal(0,v.value(osa_mem_log_g[&i].trans_src.file_code))
+&line_no=format.decimal(0,v.value(osa_mem_log_g[&i].trans_src.line_no))
+&size=format.decimal(0,v.value(osa_mem_log_g[&i].size))
+&ptr=v.value(osa_mem_log_g[&i].ptr)
+
+local &entity
+; ENTITY_KAL(ENTITY_LAST+1)
+if (&alloc_ent_id==&ENTITY_KAL)
+(
+  &entity="ENTITY_KAL"
+)
+else if (&alloc_ent_id==&entity_cnt)
+(
+  &entity="ENTITY_LAST"
+)
+else if (&alloc_ent_id<&entity_cnt)
+(
+  &entity=data.string(d:v.value(entity_name[&alloc_ent_id]))
+)
+else
+(
+  &entity="UNKNOWN(&alloc_ent_id)"
+)
+
+; if (&mem_state==&OSA_MEM_ALLOCATED)
+if (&mem_state==&OSA_MEM_ALLOCATED)
+(
+  &item_string=""
+  &item_string="&item_string"+" <item>"
+  &item_string="&item_string"+"  <alloc_id>&(alloc_id)</alloc_id>"
+  &item_string="&item_string"+"  <size>&(size)</size>"
+  &item_string="&item_string"+"  <entt>&(entity)</entt>"
+  &item_string="&item_string"+"  <file>&(file_code)</file>"
+  &item_string="&item_string"+"  <line>&(line_no)</line>"
+  &item_string="&item_string"+"  <addr>&(ptr)</addr>"
+  &item_string="&item_string"+" </item>"
+
+  print "&item_string"
+  ;print " <item>"
+  ;print "  <alloc_id>&(alloc_id)</alloc_id>"
+  ;print "  <size>&(size)</size>"
+  ;print "  <entt>&(entity)</entt>"
+  ;print "  <file>&(file_code)</file>"
+  ;print "  <line>&(line_no)</line>"
+  ;print "  <addr>&(ptr)</addr>"
+  ;print " </item>"
+)
+
+&i_tmp=&i+1
+&i=&i_tmp
+
+if (&i<&max)
+  goto CMM_LOOP_4
+  
+print "</byte_stack_pool>"
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  End                                                                                                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CMM_FILE_CLOSE:
+
+print "</osa_tx_allocations>"
+print ""
+area.close output_file_win
+area.clear output_file_win
+
+; type "&_global_osa_tx_export_mem_xml_file_path"
+
+CMM_END:
+
+if ("&caller_logging_win"=="")
+(
+  area.select logging_win
+  print ""
+  print "End time : " clock.date() "  " clock.time() "  "
+
+  ; Close the logging output window
+  ; wait 1s
+  if (&err==0)
+  (
+    area.close logging_win
+    do "&curr_script_dir\_trace32_area_delete.cmm" "logging_win"
+  )
+)
+else
+(
+  area.select &caller_logging_win
+)
+
+
+enddo
